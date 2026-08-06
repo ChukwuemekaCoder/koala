@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     supabase_url: str
     supabase_anon_key: str | None = None
+    frontend_origin: str = "http://localhost:5173"
 
 
 settings = Settings()

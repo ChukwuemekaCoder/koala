@@ -17,3 +17,10 @@ frontend/.agents/
 
 # Original spec drop (canonical copies now live at repo root / db/ / backend/)
 files.zip
+files/
+update_files.zip
+update_files/
+
+# Unexplained browser-save artifact, not project content
+migration_001_nullable_onboarding_fields.sql.html
+migration_001_nullable_onboarding_fields.sql_files/

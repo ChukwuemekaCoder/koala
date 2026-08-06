@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { createStudentProfile } from "../lib/api";
 
 type Tab = "signin" | "signup";
 type SignupStep = "form" | "verify";
@@ -94,13 +95,32 @@ export function AuthCard() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: signupEmail,
       token: code,
       type: "signup",
     });
+    if (error) {
+      setLoading(false);
+      setError(mapAuthError(error.message));
+      return;
+    }
+
+    // First sign-in after verification: create the student profile row.
+    // Session existing already proves auth succeeded, so a failure here
+    // is non-blocking — the account exists either way.
+    if (data.session) {
+      try {
+        await createStudentProfile(
+          data.session.access_token,
+          firstName,
+          lastName,
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    }
     setLoading(false);
-    if (error) setError(mapAuthError(error.message));
   }
 
   async function handleResend() {

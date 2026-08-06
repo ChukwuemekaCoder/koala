@@ -7,11 +7,12 @@ create table students (
     email text not null unique,
     first_name text not null,
     last_name text not null,
-    class_standing text not null check (class_standing in
+    class_standing text check (class_standing in
         ('freshman', 'sophomore', 'junior', 'senior')),
-    current_term text not null check (current_term in ('fall', 'spring')),
+    current_term text check (current_term in ('fall', 'spring')),
     target_grad_date date,
     has_completed_tutorial boolean not null default false,
+    onboarding_completed_at timestamptz,
     created_at timestamptz not null default now()
 );
 

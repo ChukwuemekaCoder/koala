@@ -192,8 +192,8 @@ Known gaps in the reference sketch, to be completed during implementation:
   (reject a candidate if its prerequisites aren't satisfied per
   `student_progress` + already-chosen courses in earlier semesters).
 - Cycle detection for the prerequisite graph is NOT enforced at the DB
-  level (Postgres can't easily express "no cycles" as a constraint) — must
-  be handled in application code when the dependency graph is built.
+  level (Postgres can't easily express "no cycles" as a constraint) —
+  must be handled in application code when the dependency graph is built.
 
 ---
 
@@ -302,7 +302,9 @@ that decodes the Supabase-issued JWT (via Supabase's published JWKS) to
 get `auth.uid()` and load the matching `students` row.
 
 - `POST /students/me` — create the `students` profile row immediately
-  after Supabase signup (first/last name, school). Called once.
+  after Supabase signup (first/last name, school only —
+  `class_standing`/`current_term` are nullable and NOT set here; see
+  note below).
 - `GET /students/me` — profile + onboarding status.
 - `POST /students/me/programs` — declare majors/minors (bulk, onboarding
   step 1).
@@ -311,6 +313,20 @@ get `auth.uid()` and load the matching `students` row.
 - `PATCH /students/me/progress/{course_id}` — single-course status
   correction. This is re-solve cascade entry point B (retroactive
   correction).
+
+**Note on `students` nullability**: `class_standing` and `current_term`
+are nullable in the schema, not required at row creation. A student row
+must exist the moment email verification succeeds (so
+`get_current_student` has something to load), but those two fields
+genuinely aren't known until onboarding step 2 — an earlier draft of
+this schema had them as `NOT NULL`, which was a real conflict with this
+endpoint's own description; see `migration_001_nullable_onboarding_fields.sql`
+for the fix if working against an already-applied database.
+`students.onboarding_completed_at` (timestamptz, null until set) is the
+explicit signal for "has this student finished onboarding" — set it once
+onboarding step 3 (course history confirmation) completes. Don't infer
+onboarding status from `class_standing IS NULL` — the explicit timestamp
+is unambiguous where that would be fragile.
 - `GET /courses`, `GET /programs`, `GET /courses/{id}/sections?term=` —
   catalog reads.
 - `POST /schedule/optimize` — run the solver fresh for a student. Used
@@ -382,7 +398,7 @@ Dashboard
 
 ## Redis caching
 
-Cache key shape: `schedule:{student_id}:{term}` → serialized solver
+Cache key shape: `schedule:{student_id}:{term}` — serialized solver
 output for that semester.
 
 Invalidation: on any of the three mutation points below, delete all keys
