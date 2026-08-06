@@ -136,6 +136,38 @@ input {
   color: var(--koala-muted);
 }
 
+.auth-input-wrap {
+  position: relative;
+}
+
+.auth-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.auth-input-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--koala-muted-2);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 150ms ease;
+}
+
+.auth-input-toggle:hover {
+  color: var(--koala-ink);
+}
+
 .auth-field-row {
   display: flex;
   gap: 12px;

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { createStudentProfile } from "../lib/api";
+import { PasswordField } from "./PasswordField";
 
 type Tab = "signin" | "signup";
 type SignupStep = "form" | "verify";
@@ -242,17 +243,13 @@ export function AuthCard() {
               required
             />
           </div>
-          <div className="auth-field">
-            <label htmlFor="signin-password">Password</label>
-            <input
-              id="signin-password"
-              type="password"
-              autoComplete="current-password"
-              value={signinPassword}
-              onChange={(e) => setSigninPassword(e.target.value)}
-              required
-            />
-          </div>
+          <PasswordField
+            id="signin-password"
+            label="Password"
+            autoComplete="current-password"
+            value={signinPassword}
+            onChange={setSigninPassword}
+          />
           {error && <p className="auth-error">{error}</p>}
           <button className="auth-submit" type="submit" disabled={loading}>
             Sign in
@@ -301,28 +298,20 @@ export function AuthCard() {
               <p className="auth-hint">Please use your ORU email</p>
             )}
           </div>
-          <div className="auth-field">
-            <label htmlFor="signup-password">Password</label>
-            <input
-              id="signup-password"
-              type="password"
-              autoComplete="new-password"
-              value={signupPassword}
-              onChange={(e) => setSignupPassword(e.target.value)}
-              required
-            />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="confirm-password">Confirm password</label>
-            <input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
+          <PasswordField
+            id="signup-password"
+            label="Password"
+            autoComplete="new-password"
+            value={signupPassword}
+            onChange={setSignupPassword}
+          />
+          <PasswordField
+            id="confirm-password"
+            label="Confirm password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+          />
           {error && <p className="auth-error">{error}</p>}
           <button className="auth-submit" type="submit" disabled={loading}>
             Create account
