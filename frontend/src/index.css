@@ -1,111 +1,243 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --koala-bg: #f4f5f1;
+  --koala-surface: #ffffff;
+  --koala-ink: #202b2e;
+  --koala-muted: #5b6b66;
+  --koala-muted-2: #8b968f;
+  --koala-border: #dde1d9;
+  --koala-primary: #1f5e56;
+  --koala-primary-tint: #bfd3ce;
+  --koala-gold: #c08a3e;
+  --koala-attention: #b9704a;
+  --koala-success-bg: #e1f5ee;
+  --koala-success-text: #0f6e56;
+  --koala-attention-bg: #faece7;
+  --koala-attention-text: #993c1d;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --font-display: "Fraunces", serif;
+  --font-body: "Work Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  font-family: var(--font-body);
+  font-weight: 400;
+  color: var(--koala-ink);
+  background: var(--koala-bg);
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
+#root {
+  min-height: 100svh;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+/* --- Auth screen --- */
+
+.auth-page {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--koala-surface);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(32, 43, 46, 0.06);
+  padding: 40px 36px;
+}
+
+.auth-wordmark {
+  font-family: var(--font-display);
   font-weight: 500;
-  color: var(--text-h);
+  font-size: 28px;
+  color: var(--koala-ink);
+  text-align: center;
+  margin: 0 0 28px;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+.auth-tabs {
+  display: flex;
+  background: var(--koala-bg);
+  border: 1px solid var(--koala-border);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 28px;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+.auth-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--koala-muted);
+  padding: 9px 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-code {
+.auth-tab--active {
+  background: var(--koala-surface);
+  color: var(--koala-primary);
+  box-shadow: 0 1px 3px rgba(32, 43, 46, 0.08);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field label {
+  font-size: 12px;
+  color: var(--koala-muted);
+}
+
+.auth-field input {
   font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  color: var(--koala-ink);
+  background: var(--koala-surface);
+  border: 1px solid var(--koala-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.auth-field input:focus {
+  border-color: var(--koala-primary);
+}
+
+.auth-field input:disabled {
+  background: var(--koala-bg);
+  color: var(--koala-muted);
+}
+
+.auth-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.auth-field-row .auth-field {
+  flex: 1;
+}
+
+.auth-hint {
+  font-size: 12px;
+  color: var(--koala-muted-2);
+}
+
+.auth-error {
+  font-size: 13px;
+  color: var(--koala-attention-text);
+  background: var(--koala-attention-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-submit {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--koala-bg);
+  background: var(--koala-primary);
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--koala-primary) 92%, white);
+}
+
+.auth-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-verify-heading {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  text-align: center;
+  margin: 0 0 6px;
+}
+
+.auth-verify-subtext {
+  font-size: 14px;
+  color: var(--koala-muted);
+  text-align: center;
+  margin: 0 0 24px;
+}
+
+.auth-verify-subtext strong {
+  color: var(--koala-ink);
+  font-weight: 500;
+}
+
+.auth-code-input {
+  text-align: center;
+  letter-spacing: 6px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 20px;
+}
+
+.auth-ghost {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--koala-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  text-align: center;
+}
+
+.auth-ghost:hover {
+  color: var(--koala-ink);
+}
+
+.auth-signed-in {
+  text-align: center;
+}
+
+.auth-signed-in p {
+  color: var(--koala-muted);
+  font-size: 14px;
+}
+
+.auth-signed-in strong {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--koala-ink);
 }

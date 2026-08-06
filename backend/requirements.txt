@@ -3,3 +3,4 @@ uvicorn[standard]>=0.32,<0.33
 asyncpg>=0.30,<0.31
 pydantic-settings>=2.6,<3
 redis>=5.2,<6
+PyJWT[crypto]>=2.9,<3

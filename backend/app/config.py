@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str
     redis_url: str = "redis://redis:6379/0"
-    supabase_url: str | None = None
+    supabase_url: str
     supabase_anon_key: str | None = None
 
 
