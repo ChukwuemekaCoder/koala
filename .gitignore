@@ -1,0 +1,19 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+dist/
+
+# IDE-installed agent skill docs, not part of the project (unclear origin)
+frontend/.agents/
+
+# Original spec drop (canonical copies now live at repo root / db/ / backend/)
+files.zip
