@@ -50,6 +50,16 @@ export function AuthCard() {
   async function handleSignIn(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!signinEmail.trim()) {
+      setError("Enter your school email to continue.");
+      return;
+    }
+    if (!signinPassword) {
+      setError("Enter your password to continue.");
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: signinEmail,
@@ -63,8 +73,29 @@ export function AuthCard() {
     e.preventDefault();
     setError(null);
 
+    if (!firstName.trim()) {
+      setError("Enter your first name to continue.");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Enter your last name to continue.");
+      return;
+    }
+    if (!signupEmail.trim()) {
+      setSignupEmailTouched(true);
+      setError("Enter your school email to continue.");
+      return;
+    }
     if (!signupEmailValid) {
       setSignupEmailTouched(true);
+      return;
+    }
+    if (!signupPassword) {
+      setError("Enter your password to continue.");
+      return;
+    }
+    if (!confirmPassword) {
+      setError("Confirm your password to continue.");
       return;
     }
     if (signupPassword !== confirmPassword) {
@@ -94,6 +125,12 @@ export function AuthCard() {
   async function handleVerify(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!code.trim()) {
+      setError("Enter the code we sent you.");
+      return;
+    }
+
     setLoading(true);
     const { data, error } = await supabase.auth.verifyOtp({
       email: signupEmail,
@@ -140,7 +177,7 @@ export function AuthCard() {
         <p className="auth-verify-subtext">
           We sent a code to <strong>{signupEmail}</strong>
         </p>
-        <form className="auth-form" onSubmit={handleVerify}>
+        <form className="auth-form" onSubmit={handleVerify} noValidate>
           <div className="auth-field">
             <label htmlFor="code">Verification code</label>
             <input
@@ -193,7 +230,7 @@ export function AuthCard() {
       </div>
 
       {tab === "signin" ? (
-        <form className="auth-form" onSubmit={handleSignIn}>
+        <form className="auth-form" onSubmit={handleSignIn} noValidate>
           <div className="auth-field">
             <label htmlFor="signin-email">School email</label>
             <input
@@ -222,7 +259,7 @@ export function AuthCard() {
           </button>
         </form>
       ) : (
-        <form className="auth-form" onSubmit={handleSignUp}>
+        <form className="auth-form" onSubmit={handleSignUp} noValidate>
           <div className="auth-field-row">
             <div className="auth-field">
               <label htmlFor="first-name">First name</label>
