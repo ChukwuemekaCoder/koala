@@ -21,8 +21,28 @@ function mapAuthError(message: string): string {
   return message;
 }
 
-export function AuthCard() {
-  const [tab, setTab] = useState<Tab>("signin");
+interface AuthCardProps {
+  onBack?: () => void;
+  initialTab?: Tab;
+}
+
+function Wordmark({ onBack }: { onBack?: () => void }) {
+  if (!onBack) {
+    return <p className="wordmark auth-wordmark">koala</p>;
+  }
+  return (
+    <button
+      type="button"
+      className="wordmark auth-wordmark auth-wordmark-btn"
+      onClick={onBack}
+    >
+      koala
+    </button>
+  );
+}
+
+export function AuthCard({ onBack, initialTab = "signin" }: AuthCardProps) {
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   // Sign in state
   const [signinEmail, setSigninEmail] = useState("");
@@ -172,8 +192,8 @@ export function AuthCard() {
 
   if (tab === "signup" && signupStep === "verify") {
     return (
-      <div className="auth-card">
-        <p className="auth-wordmark">koala</p>
+      <div className="card auth-card">
+        <Wordmark onBack={onBack} />
         <h1 className="auth-verify-heading">Check your email</h1>
         <p className="auth-verify-subtext">
           We sent a code to <strong>{signupEmail}</strong>
@@ -193,7 +213,7 @@ export function AuthCard() {
             />
           </div>
           {error && <p className="auth-error">{error}</p>}
-          <button className="auth-submit" type="submit" disabled={loading}>
+          <button className="btn-primary" type="submit" disabled={loading}>
             Verify email
           </button>
           <button
@@ -210,8 +230,8 @@ export function AuthCard() {
   }
 
   return (
-    <div className="auth-card">
-      <p className="auth-wordmark">koala</p>
+    <div className="card auth-card">
+      <Wordmark onBack={onBack} />
 
       <div className="auth-tabs">
         <button
@@ -251,7 +271,7 @@ export function AuthCard() {
             onChange={setSigninPassword}
           />
           {error && <p className="auth-error">{error}</p>}
-          <button className="auth-submit" type="submit" disabled={loading}>
+          <button className="btn-primary" type="submit" disabled={loading}>
             Sign in
           </button>
         </form>
@@ -313,7 +333,7 @@ export function AuthCard() {
             onChange={setConfirmPassword}
           />
           {error && <p className="auth-error">{error}</p>}
-          <button className="auth-submit" type="submit" disabled={loading}>
+          <button className="btn-primary" type="submit" disabled={loading}>
             Create account
           </button>
         </form>

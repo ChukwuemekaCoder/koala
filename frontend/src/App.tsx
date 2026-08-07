@@ -2,10 +2,16 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { AuthCard } from "./components/AuthCard";
+import { Landing } from "./components/landing/Landing";
+
+type View = "landing" | "auth";
+type AuthTab = "signin" | "signup";
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
+  const [view, setView] = useState<View>("landing");
+  const [authTab, setAuthTab] = useState<AuthTab>("signin");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -26,26 +32,48 @@ function App() {
     return <div className="auth-page" />;
   }
 
-  return (
-    <div className="auth-page">
-      {session ? (
-        <div className="auth-card auth-signed-in">
-          <p className="auth-wordmark">koala</p>
+  if (session) {
+    return (
+      <div className="auth-page">
+        <div className="card auth-card auth-signed-in">
+          <p className="wordmark auth-wordmark">koala</p>
           <p>
             Signed in as <strong>{session.user.email}</strong>
           </p>
           <button
-            className="auth-submit"
+            className="btn-primary"
             type="button"
             onClick={() => supabase.auth.signOut()}
           >
             Sign out
           </button>
         </div>
-      ) : (
-        <AuthCard />
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  if (view === "auth") {
+    return (
+      <div className="auth-page">
+        <AuthCard
+          initialTab={authTab}
+          onBack={() => setView("landing")}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <Landing
+      onSignIn={() => {
+        setAuthTab("signin");
+        setView("auth");
+      }}
+      onGetStarted={() => {
+        setAuthTab("signup");
+        setView("auth");
+      }}
+    />
   );
 }
 
