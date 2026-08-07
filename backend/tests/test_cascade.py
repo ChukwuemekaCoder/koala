@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.solver.cascade import current_term_label, next_term_label
+from app.solver.cascade import current_term_label, next_term_label, term_sort_key
 
 
 def test_current_term_label_fall_months():
@@ -30,3 +30,15 @@ def test_next_term_label_fall_to_spring_increments_year():
 
 def test_next_term_label_spring_to_fall_same_year():
     assert next_term_label("Spring 2027") == "Fall 2027"
+
+
+def test_term_sort_key_orders_chronologically_not_alphabetically():
+    # "Fall 2026" < "Spring 2026" alphabetically, but Spring comes first
+    # in the calendar year — sorting by term_sort_key must get this right.
+    terms = ["Fall 2027", "Spring 2026", "Fall 2026", "Spring 2027"]
+    assert sorted(terms, key=term_sort_key) == [
+        "Spring 2026",
+        "Fall 2026",
+        "Spring 2027",
+        "Fall 2027",
+    ]

@@ -79,3 +79,24 @@ async def test_get_schedule_empty_when_no_plan_exists(client):
     res = await client.get("/schedule/me", params={"term": "Fall 2026"})
     assert res.status_code == 200
     assert res.json() == {"term": "Fall 2026", "courses": []}
+
+
+@pytest.mark.asyncio
+async def test_get_full_plan_empty_when_no_plan_exists(client):
+    res = await client.get("/schedule/me/plan")
+    assert res.status_code == 200
+    assert res.json() == {"semesters": []}
+
+
+@pytest.mark.asyncio
+async def test_get_projection_zeros_when_nothing_declared_or_planned(client):
+    res = await client.get("/schedule/me/projection")
+    assert res.status_code == 200
+    body = res.json()
+    assert body == {
+        "credits_taken": 0,
+        "credits_in_progress": 0,
+        "credits_remaining": 0,
+        "degree_percent": 0.0,
+        "projected_graduation": None,
+    }

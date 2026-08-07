@@ -242,6 +242,39 @@ async def test_optimize_get_and_override_end_to_end(test_user):
             )
             assert get_res_2.json() == get_res.json()
 
+            # GET /schedule/me/plan should return every semester optimize
+            # persisted, not just one term — this is the endpoint the
+            # dashboard's semester outlook row actually needs, which
+            # didn't exist before this stage.
+            full_plan_res = await api.get("/schedule/me/plan", headers=headers)
+            assert full_plan_res.status_code == 200
+            full_plan = full_plan_res.json()
+            assert {s["term"] for s in full_plan["semesters"]} == {
+                s["term"] for s in plan["semesters"]
+            }
+            assert full_plan["semesters"] == sorted(
+                full_plan["semesters"], key=lambda s: s["term"] != first_term
+            )  # first_term (chronologically earliest) sorts first
+            for course in full_plan["semesters"][0]["courses"]:
+                assert course["category"] in ("major", "minor", "gen_ed")
+
+            # GET /schedule/me/projection: CS110 (3cr) marked done is the
+            # only real completion so far; declared CS+Math's full
+            # requirement pool is exactly 28 credits across 8 courses
+            # (db/seed_test_catalog.sql), so remaining = 28 - 3 = 25.
+            projection_res = await api.get("/schedule/me/projection", headers=headers)
+            assert projection_res.status_code == 200
+            projection = projection_res.json()
+            assert projection["credits_taken"] == 3
+            assert projection["credits_in_progress"] == 0
+            assert projection["credits_remaining"] == 25
+            assert projection["degree_percent"] == round(3 / 28 * 100, 1)
+            assert projection["projected_graduation"] is not None
+            assert any(
+                projection["projected_graduation"].startswith(month)
+                for month in ("May", "December")
+            )
+
             # Override: remove one course from the first semester.
             course_to_remove = first_semester["courses"][0]["course_id"]
             override_res = await api.post(

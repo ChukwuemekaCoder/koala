@@ -16,6 +16,7 @@ from app.solver.catalog import (
     PrerequisiteCycleError,
     _check_for_cycles,
     _remaining_requirements_for_declared_programs,
+    categories_from_remaining,
     load_locked_candidates,
     load_term_candidates,
 )
@@ -92,6 +93,17 @@ async def test_double_counted_course_takes_max_tier(db_pool):
         db_pool, FAKE_STUDENT_ID, [CS, MATH]
     )
     assert remaining[MATH121].tier == TIER_MAJOR  # from CS's major_core row
+
+
+@pytest.mark.asyncio
+async def test_categories_from_remaining_maps_tiers_to_labels(db_pool):
+    remaining = await _remaining_requirements_for_declared_programs(
+        db_pool, FAKE_STUDENT_ID, [CS, MATH]
+    )
+    categories = categories_from_remaining(remaining)
+    assert categories[CS110] == "major"
+    assert categories[THEO101] == "gen_ed"
+    assert categories[MATH120] == "major"  # promoted, structurally required
 
 
 @pytest.mark.asyncio

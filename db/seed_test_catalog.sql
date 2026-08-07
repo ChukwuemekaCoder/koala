@@ -140,6 +140,17 @@ insert into sections (course_id, term, days, start_time, end_time, seats_total) 
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
           else 'Spring ' || (extract(year from now())::int + 1) end,
-     'TR', '11:00', '12:15', 30);
+     'TR', '11:00', '12:15', 30),
+    -- term after next: CS310 needs CS210 (seeded in the "next term"
+    -- bucket above), so it can't be schedulable any earlier than a
+    -- third term without violating its own prerequisite. Without this
+    -- row CS310 has zero sections ever, which is a required major_core
+    -- course that can never be scheduled — the walk-forward cascade
+    -- would spin through all MAX_SEMESTERS terms looking for it.
+    ('bbbbbbbb-0000-0000-0000-000000000003',
+     case when extract(month from now()) between 1 and 7
+          then 'Spring ' || (extract(year from now())::int + 1)
+          else 'Fall ' || (extract(year from now())::int + 1) end,
+     'MWF', '10:00', '10:50', 30);
 
 commit;

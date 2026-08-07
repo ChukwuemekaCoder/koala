@@ -13,6 +13,8 @@
   --koala-success-text: #0f6e56;
   --koala-attention-bg: #faece7;
   --koala-attention-text: #993c1d;
+  --koala-other-bg: #ece9f7;
+  --koala-other-text: #5b4e96;
 
   --font-display: "Fraunces", serif;
   --font-body: "Work Sans", sans-serif;
@@ -161,6 +163,11 @@ input {
 .calendar-block--attention {
   background: var(--koala-attention-bg);
   color: var(--koala-attention-text);
+}
+
+.calendar-block--other {
+  background: var(--koala-other-bg);
+  color: var(--koala-other-text);
 }
 
 .star-rating {
@@ -833,4 +840,225 @@ input {
   max-width: 520px;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* --- Dashboard (main workpage) --- */
+
+.dashboard-page {
+  min-height: 100svh;
+  background: var(--koala-bg);
+}
+
+.dashboard-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+/* App header */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 0.5px solid var(--koala-border);
+  margin-bottom: 40px;
+}
+
+.app-header-wordmark {
+  font-size: 20px;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--koala-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.app-header-icon-btn:hover {
+  background: var(--koala-surface);
+}
+
+.app-header-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--koala-primary-tint);
+  color: var(--koala-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Greeting + timeline */
+.dashboard-greeting {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 26px;
+  color: var(--koala-ink);
+  margin: 0 0 32px;
+}
+
+.dashboard-timeline-wrap {
+  margin-bottom: 40px;
+}
+
+/* Metric cards */
+.metric-cards-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 700px) {
+  .metric-cards-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Semester outlook row */
+.dashboard-section-heading {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--koala-ink);
+  margin: 0 0 16px;
+}
+
+.semester-outlook-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 40px;
+}
+
+.semester-outlook-card {
+  flex: 0 0 auto;
+  width: 110px;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid transparent;
+  background: var(--koala-surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.semester-outlook-card:active {
+  transform: scale(0.98);
+}
+
+.semester-outlook-card--current {
+  border-color: var(--koala-gold);
+}
+
+.semester-outlook-card--current .semester-outlook-term {
+  color: var(--koala-attention);
+  font-weight: 600;
+}
+
+.semester-outlook-card--expanded {
+  box-shadow: 0 4px 16px rgba(32, 43, 46, 0.12);
+}
+
+.semester-outlook-term {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--koala-ink);
+}
+
+.semester-outlook-credits {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--koala-ink);
+}
+
+/* Expanded semester detail: weekly calendar grid */
+.calendar-grid-wrap {
+  padding: 24px;
+}
+
+.calendar-grid-caption {
+  font-size: 13px;
+  color: var(--koala-attention-text);
+  background: var(--koala-attention-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 20px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.calendar-grid-days {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.calendar-grid-day-label {
+  font-size: 12px;
+  color: var(--koala-muted-2);
+  text-align: center;
+}
+
+.calendar-grid-body {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  height: 560px;
+  position: relative;
+}
+
+.calendar-grid-day-col {
+  position: relative;
+  background: var(--koala-bg);
+  border-radius: 8px;
+}
+
+.calendar-grid-body .calendar-block {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  line-height: 1.3;
+}
+
+.calendar-grid-empty {
+  font-size: 14px;
+  color: var(--koala-muted);
+  padding: 24px 0;
 }

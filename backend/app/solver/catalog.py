@@ -21,6 +21,12 @@ from app.solver.scheduler_backtracking_sketch import (
 _MAJOR_CATEGORIES = {"major_core", "major_elective"}
 _GENED_CATEGORIES = {"gen_ed", "christian_coursework"}
 
+_TIER_TO_CATEGORY = {
+    TIER_MAJOR: "major",
+    TIER_MINOR: "minor",
+    TIER_GENED: "gen_ed",
+}
+
 
 class PrerequisiteCycleError(Exception):
     """The prerequisite graph among a student's remaining courses has a
@@ -155,6 +161,32 @@ async def _remaining_requirements_for_declared_programs(
 
     await _load_prerequisites_and_unlocks(pool, remaining)
     return remaining
+
+
+async def load_course_categories(
+    pool: asyncpg.Pool, student_id: str
+) -> dict[str, str]:
+    """
+    course_id -> "major" | "minor" | "gen_ed" for the student's currently
+    remaining requirements — used to color-code the dashboard's calendar
+    grid per DESIGN.md ("colored fill tied to category, not arbitrary").
+    Reuses the same max-tier-wins logic as tier assignment for the
+    solver itself, just relabeled for display rather than priority
+    ordering. A course no longer in "remaining" (e.g. already marked
+    done since being scheduled) defaults to "major" — a rare edge case
+    for a display-only label, not worth a special code path.
+    """
+    remaining = await load_remaining_requirements(pool, student_id)
+    return categories_from_remaining(remaining)
+
+
+def categories_from_remaining(remaining: dict[str, RequiredCourse]) -> dict[str, str]:
+    """Pure tier->label mapping, split out from load_course_categories()
+    so it's testable without a real student_programs row."""
+    return {
+        course_id: _TIER_TO_CATEGORY.get(required.tier, "major")
+        for course_id, required in remaining.items()
+    }
 
 
 async def _load_prerequisites_and_unlocks(

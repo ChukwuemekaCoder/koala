@@ -69,6 +69,19 @@ def next_term_label(term: str) -> str:
     return f"Fall {year}"
 
 
+def term_sort_key(term: str) -> tuple[int, int]:
+    """
+    Chronological sort key for a "Season Year" label — needed because
+    the labels don't sort correctly as plain text ("Fall 2026" <
+    "Spring 2026" alphabetically despite Spring coming first in the
+    calendar year). Works for any term, past or future, unlike
+    terms_before()/load_existing_future_terms() which only walk forward
+    from a known starting point.
+    """
+    season, year_str = term.split()
+    return (int(year_str), 0 if season == "Spring" else 1)
+
+
 def terms_before(target_term: str, start_term: str | None = None) -> list[str]:
     """
     Canonical term labels from `start_term` (default: the real current

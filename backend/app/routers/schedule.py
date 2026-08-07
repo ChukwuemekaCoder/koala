@@ -10,12 +10,18 @@ from app.solver.scheduler_backtracking_sketch import MAX_CREDITS, MIN_CREDITS, C
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
-def _serialize_candidate(candidate: Candidate, is_flagged: bool = False, flag_reason: str | None = None) -> dict:
+def _serialize_candidate(
+    candidate: Candidate,
+    category: str = "major",
+    is_flagged: bool = False,
+    flag_reason: str | None = None,
+) -> dict:
     return {
         "course_id": candidate.course.id,
         "code": candidate.course.code,
         "title": candidate.course.title,
         "credit_hours": candidate.course.credit_hours,
+        "category": category,
         "section_id": candidate.section.id,
         "days": candidate.section.days,
         "start_time": candidate.section.start_time.isoformat(),
@@ -26,7 +32,12 @@ def _serialize_candidate(candidate: Candidate, is_flagged: bool = False, flag_re
     }
 
 
-def _serialize_cascade(result: cascade.CascadeResult, flagged_terms: dict[str, str] | None = None) -> dict:
+def _serialize_cascade(
+    result: cascade.CascadeResult,
+    categories: dict[str, str] | None = None,
+    flagged_terms: dict[str, str] | None = None,
+) -> dict:
+    categories = categories or {}
     flagged_terms = flagged_terms or {}
     semesters = []
     for semester in result.semesters:
@@ -39,7 +50,12 @@ def _serialize_cascade(result: cascade.CascadeResult, flagged_terms: dict[str, s
                 "is_flagged": flag_reason is not None,
                 "flag_reason": flag_reason,
                 "courses": [
-                    _serialize_candidate(c, is_flagged=flag_reason is not None, flag_reason=flag_reason)
+                    _serialize_candidate(
+                        c,
+                        category=categories.get(c.course.id, "major"),
+                        is_flagged=flag_reason is not None,
+                        flag_reason=flag_reason,
+                    )
                     for c in semester.chosen
                 ],
             }
@@ -123,7 +139,9 @@ async def optimize(student: dict = Depends(get_current_student)) -> dict:
     await _persist_cascade_result(student_id, result)
     await _cleanup_orphaned_terms(student_id, {s.term for s in result.semesters})
     await cache.invalidate_schedule_cache(student_id)
-    return _serialize_cascade(result)
+
+    categories = await catalog.load_course_categories(pool, student_id)
+    return _serialize_cascade(result, categories=categories)
 
 
 class OverrideRequest(BaseModel):
@@ -275,7 +293,27 @@ async def override(
 
     await _persist_cascade_result(student_id, result, flagged_terms=flagged_terms)
     await cache.invalidate_schedule_cache(student_id)
-    return _serialize_cascade(result, flagged_terms=flagged_terms)
+
+    categories = await catalog.load_course_categories(pool, student_id)
+    return _serialize_cascade(result, categories=categories, flagged_terms=flagged_terms)
+
+
+def _row_to_course_dict(r: dict, categories: dict[str, str]) -> dict:
+    course_id = str(r["course_id"])
+    return {
+        "course_id": course_id,
+        "code": r["code"],
+        "title": r["title"],
+        "credit_hours": r["credit_hours"],
+        "category": categories.get(course_id, "major"),
+        "section_id": str(r["section_id"]),
+        "days": r["days"],
+        "start_time": r["start_time"].isoformat(),
+        "end_time": r["end_time"].isoformat(),
+        "is_locked": r["is_locked"],
+        "is_flagged": r["is_flagged"],
+        "flag_reason": r["flag_reason"],
+    }
 
 
 @router.get("/me")
@@ -300,21 +338,108 @@ async def get_schedule(term: str, student: dict = Depends(get_current_student)) 
         student_id,
         term,
     )
-    courses = [
-        {
-            "course_id": str(r["course_id"]),
-            "code": r["code"],
-            "title": r["title"],
-            "credit_hours": r["credit_hours"],
-            "section_id": str(r["section_id"]),
-            "days": r["days"],
-            "start_time": r["start_time"].isoformat(),
-            "end_time": r["end_time"].isoformat(),
-            "is_locked": r["is_locked"],
-            "is_flagged": r["is_flagged"],
-            "flag_reason": r["flag_reason"],
-        }
-        for r in rows
-    ]
+    categories = await catalog.load_course_categories(pool, student_id)
+    courses = [_row_to_course_dict(dict(r), categories) for r in rows]
     await cache.set_cached_schedule(student_id, term, courses)
     return {"term": term, "courses": courses}
+
+
+@router.get("/me/plan")
+async def get_full_plan(student: dict = Depends(get_current_student)) -> dict:
+    """
+    Every semester the student currently has a persisted plan for, not
+    just one term — CLAUDE.md's GET /schedule/me?term= is explicitly
+    per-term, but the dashboard's semester outlook row needs the whole
+    plan at once. Added as its own endpoint rather than overloading
+    GET /schedule/me's response shape when term is omitted, so existing
+    callers of the per-term endpoint are unaffected. Not cached (unlike
+    the per-term endpoint) — CLAUDE.md's caching spec is specifically
+    per-term (schedule:{student_id}:{term}); an aggregate cache key
+    isn't part of that spec, and this is already a single indexed query.
+    """
+    student_id = str(student["id"])
+    pool = get_pool()
+
+    rows = await pool.fetch(
+        """
+        select sp.term, sp.section_id, sp.is_locked, sp.is_flagged, sp.flag_reason,
+               c.id as course_id, c.code, c.title, c.credit_hours,
+               se.days, se.start_time, se.end_time
+        from semester_plans sp
+        join sections se on se.id = sp.section_id
+        join courses c on c.id = se.course_id
+        where sp.student_id = $1
+        """,
+        student_id,
+    )
+    categories = await catalog.load_course_categories(pool, student_id)
+
+    semesters: dict[str, dict] = {}
+    for r in rows:
+        term = r["term"]
+        semester = semesters.setdefault(
+            term, {"term": term, "is_flagged": False, "flag_reason": None, "courses": []}
+        )
+        if r["is_flagged"]:
+            semester["is_flagged"] = True
+            semester["flag_reason"] = r["flag_reason"]
+        semester["courses"].append(_row_to_course_dict(dict(r), categories))
+
+    for semester in semesters.values():
+        semester["total_credits"] = sum(c["credit_hours"] for c in semester["courses"])
+
+    ordered = sorted(
+        semesters.values(), key=lambda s: cascade.term_sort_key(s["term"])
+    )
+    return {"semesters": ordered}
+
+
+@router.get("/me/projection")
+async def get_projection(student: dict = Depends(get_current_student)) -> dict:
+    """Graduation date estimate + credit hour summary (taken/in-progress/
+    remaining), per CLAUDE.md. Reads persisted state only — doesn't
+    trigger a solve."""
+    student_id = str(student["id"])
+    pool = get_pool()
+
+    progress_rows = await pool.fetch(
+        """
+        select sp.status, c.credit_hours
+        from student_progress sp
+        join courses c on c.id = sp.course_id
+        where sp.student_id = $1
+        """,
+        student_id,
+    )
+    credits_taken = sum(r["credit_hours"] for r in progress_rows if r["status"] == "done")
+    credits_in_progress = sum(
+        r["credit_hours"] for r in progress_rows if r["status"] == "in_progress"
+    )
+
+    remaining = await catalog.load_remaining_requirements(pool, student_id)
+    credits_remaining = sum(rc.course.credit_hours for rc in remaining.values())
+
+    total_credits = credits_taken + credits_in_progress + credits_remaining
+    degree_percent = (
+        round((credits_taken / total_credits) * 100, 1) if total_credits > 0 else 0.0
+    )
+
+    term_rows = await pool.fetch(
+        "select distinct term from semester_plans where student_id = $1", student_id
+    )
+    projected_graduation = None
+    if term_rows:
+        latest_term = max(
+            (r["term"] for r in term_rows), key=cascade.term_sort_key
+        )
+        season, year = latest_term.split()
+        month = "December" if season == "Fall" else "May"
+        projected_graduation = f"{month} {year}"
+
+    return {
+        "credits_taken": credits_taken,
+        "credits_in_progress": credits_in_progress,
+        "credits_remaining": credits_remaining,
+        "degree_percent": degree_percent,
+        "projected_graduation": projected_graduation,
+    }

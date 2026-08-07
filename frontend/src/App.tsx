@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabaseClient";
 import { AuthCard } from "./components/AuthCard";
 import { Landing } from "./components/landing/Landing";
+import { Dashboard } from "./components/dashboard/Dashboard";
 
 type View = "landing" | "auth";
 type AuthTab = "signin" | "signup";
@@ -34,21 +35,10 @@ function App() {
 
   if (session) {
     return (
-      <div className="auth-page">
-        <div className="card auth-card auth-signed-in">
-          <p className="wordmark auth-wordmark">koala</p>
-          <p>
-            Signed in as <strong>{session.user.email}</strong>
-          </p>
-          <button
-            className="btn-primary"
-            type="button"
-            onClick={() => supabase.auth.signOut()}
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
+      <Dashboard
+        accessToken={session.access_token}
+        onSignOut={() => supabase.auth.signOut()}
+      />
     );
   }
 
