@@ -11,6 +11,10 @@ Skipped automatically if the key isn't set (e.g. in CI before that
 secret is configured), rather than failing the whole suite.
 """
 
+import logging
+from collections.abc import Coroutine
+from typing import Any
+
 import httpx
 import pytest
 import pytest_asyncio
@@ -20,6 +24,8 @@ from app import cache
 from app.config import settings
 from app.db import close_pool, init_pool
 from app.main import app
+
+logger = logging.getLogger(__name__)
 
 pytestmark = pytest.mark.skipif(
     not settings.supabase_service_role_key,
@@ -73,7 +79,22 @@ async def _delete_test_user_by_email(client: httpx.AsyncClient) -> None:
 
 async def _delete_test_user(user_id: str) -> None:
     async with httpx.AsyncClient(base_url=settings.supabase_url) as client:
-        await client.delete(f"/auth/v1/admin/users/{user_id}", headers=_admin_headers)
+        res = await client.delete(f"/auth/v1/admin/users/{user_id}", headers=_admin_headers)
+        res.raise_for_status()
+
+
+async def _best_effort(description: str, coro: Coroutine[Any, Any, Any]) -> None:
+    """
+    Runs a teardown step without letting its failure stop the rest of
+    teardown from running — logged loudly instead of raised, since a
+    silent failure here (e.g. the Admin API delete not going through)
+    would otherwise leave the test user behind with no signal that it
+    happened.
+    """
+    try:
+        await coro
+    except Exception:
+        logger.exception("Integration test teardown step failed: %s", description)
 
 
 async def _sign_in() -> str:
@@ -94,14 +115,26 @@ async def test_user(db_pool):
     try:
         yield user_id
     finally:
-        await db_pool.execute(
-            "delete from semester_plans where student_id = $1", user_id
+        # Each step runs independently — one failing (e.g. a transient
+        # DB hiccup on the first delete) must not skip the rest,
+        # especially the auth user deletion.
+        await _best_effort(
+            "delete semester_plans",
+            db_pool.execute(
+                "delete from semester_plans where student_id = $1", user_id
+            ),
         )
-        await db_pool.execute(
-            "delete from student_programs where student_id = $1", user_id
+        await _best_effort(
+            "delete student_programs",
+            db_pool.execute(
+                "delete from student_programs where student_id = $1", user_id
+            ),
         )
-        await db_pool.execute("delete from students where id = $1", user_id)
-        await _delete_test_user(user_id)
+        await _best_effort(
+            "delete students",
+            db_pool.execute("delete from students where id = $1", user_id),
+        )
+        await _best_effort("delete auth user", _delete_test_user(user_id))
 
 
 @pytest.mark.asyncio
