@@ -1,0 +1,5 @@
+[tool.ruff.lint]
+# B008: FastAPI's Depends()/Security() in argument defaults is the
+# framework's own documented dependency-injection pattern, not a bug —
+# ruff's "don't call functions in defaults" check doesn't know that.
+ignore = ["B008"]

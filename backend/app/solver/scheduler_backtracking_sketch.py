@@ -1,11 +1,12 @@
 """
-Backtracking schedule solver — core algorithm sketch.
+Backtracking schedule solver — core algorithm.
 
 This solves ONE semester at a time: given a student's remaining degree
 requirements and the sections actually offered that term, pick the best
-non-conflicting set of courses within [MIN_CREDITS, MAX_CREDITS].
+non-conflicting, prerequisite-satisfying set of courses within
+[MIN_CREDITS, MAX_CREDITS].
 
-Design goals this sketch demonstrates:
+Design goals:
   1. Priority ordering (tier + bottleneck score) decides WHICH courses
      to try first — this is what keeps the search fast in practice,
      since a good ordering finds a solution almost immediately and
@@ -14,17 +15,18 @@ Design goals this sketch demonstrates:
      wrong (a course that seemed fine blocks a higher-priority one later).
   3. Locked courses (from manual overrides) are hard constraints — they
      go in first, before the search even starts.
-  4. Credit-hour bounds are enforced as pruning conditions, not
-     after-the-fact validation — an invalid partial schedule is
-     abandoned immediately rather than explored further.
+  4. Credit-hour bounds and prerequisite satisfaction are enforced as
+     pruning conditions, not after-the-fact validation — an invalid
+     partial schedule is abandoned immediately rather than explored
+     further.
 
-This is intentionally simplified (no DB calls, no lookahead tiebreaking —
-that's the deferred v2 feature). It's meant to be tested standalone with
-mock data before wiring into FastAPI/Postgres.
+No DB calls here — see catalog.py for turning Postgres rows into the
+Course/Section/Candidate objects this module operates on, and cascade.py
+for the multi-semester walk that calls solve_semester() once per term.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from datetime import time
 
 MIN_CREDITS = 12
 MAX_CREDITS = 18
@@ -43,13 +45,17 @@ class Course:
     offering_frequency: str  # "every_semester" | "annual" | "biennial"
     prereq_ids: list[str] = field(default_factory=list)
     unlocks_count: int = 0    # how many other remaining courses depend on this one
+    code: str = ""            # display metadata only — not used by the solver logic
+    title: str = ""
 
 
 @dataclass
 class Section:
     id: str
     course_id: str
-    day_time: tuple[str, ...]  # e.g. ("MWF", "10:00-10:50")
+    days: str        # e.g. "MWF" — any combination of M/T/W/R/F/S/U
+    start_time: time
+    end_time: time
 
 
 @dataclass
@@ -90,17 +96,52 @@ def priority_key(candidate: Candidate) -> tuple:
 
 
 def has_time_conflict(section_a: Section, section_b: Section) -> bool:
-    """Placeholder — real version parses day/time overlap properly."""
-    return section_a.day_time == section_b.day_time
+    """
+    Two sections conflict only if their day-letters share a character
+    AND their time ranges overlap.
+    """
+    shares_day = any(d in section_b.days for d in section_a.days)
+    overlaps_time = (
+        section_a.start_time < section_b.end_time
+        and section_b.start_time < section_a.end_time
+    )
+    return shares_day and overlaps_time
+
+
+def prerequisites_satisfied(
+    course: Course, completed_course_ids: set[str]
+) -> bool:
+    """
+    A course's prerequisites are satisfied if every prerequisite is in
+    `completed_course_ids` — the union of what's `done`/`in_progress`
+    in student_progress plus whatever the solver already chose in
+    strictly earlier semesters of the current multi-semester run (see
+    cascade.py). Courses with no prerequisites are trivially satisfied.
+    """
+    return all(prereq_id in completed_course_ids for prereq_id in course.prereq_ids)
 
 
 def solve_semester(
     candidates: list[Candidate],
-) -> Optional[list[Candidate]]:
+    completed_course_ids: set[str] | None = None,
+    min_credits: int = MIN_CREDITS,
+) -> list[Candidate] | None:
     """
     Entry point. Returns a valid schedule (list of chosen candidates)
-    or None if no valid schedule exists within the credit bounds.
+    or None if no valid schedule exists within the credit bounds and
+    prerequisite constraints.
+
+    `min_credits` defaults to the standard MIN_CREDITS floor, but callers
+    solving a student's final semester (fewer remaining requirements
+    than a full course load) should pass a lower value — otherwise a
+    legitimately-finished plan would be reported as infeasible purely
+    for having nothing left to fill the last semester to 12 credits.
+    This doesn't change the two gaps this module was built to fill
+    (conflict/prerequisite pruning); it's an additive parameter for a
+    real edge case the walk-forward cascade (cascade.py) hits.
     """
+    completed_course_ids = completed_course_ids or set()
+
     ordered = sorted(candidates, key=priority_key)
     locked = [c for c in ordered if c.locked]
     choosable = [c for c in ordered if not c.locked]
@@ -115,6 +156,8 @@ def solve_semester(
         remaining=choosable,
         chosen=list(locked),
         total_credits=locked_credits,
+        completed_course_ids=completed_course_ids,
+        min_credits=min_credits,
     )
     return result
 
@@ -123,9 +166,11 @@ def _backtrack(
     remaining: list[Candidate],
     chosen: list[Candidate],
     total_credits: int,
-) -> Optional[list[Candidate]]:
+    completed_course_ids: set[str],
+    min_credits: int,
+) -> list[Candidate] | None:
     # Base case: enough credits and nothing higher-priority left to try
-    if total_credits >= MIN_CREDITS and not remaining:
+    if total_credits >= min_credits and not remaining:
         return chosen
 
     if not remaining:
@@ -138,13 +183,16 @@ def _backtrack(
     conflict = any(
         has_time_conflict(next_candidate.section, c.section) for c in chosen
     )
+    prereqs_ok = prerequisites_satisfied(next_candidate.course, completed_course_ids)
     new_total = total_credits + next_candidate.course.credit_hours
 
-    if not conflict and new_total <= MAX_CREDITS:
+    if not conflict and prereqs_ok and new_total <= MAX_CREDITS:
         result = _backtrack(
             remaining=rest,
             chosen=chosen + [next_candidate],
             total_credits=new_total,
+            completed_course_ids=completed_course_ids,
+            min_credits=min_credits,
         )
         if result is not None:
             return result
@@ -155,6 +203,8 @@ def _backtrack(
         remaining=rest,
         chosen=chosen,
         total_credits=total_credits,
+        completed_course_ids=completed_course_ids,
+        min_credits=min_credits,
     )
 
 
@@ -162,21 +212,27 @@ if __name__ == "__main__":
     # Minimal smoke test with mock data. CALC2 and THEO201 clash at the
     # same time slot — the solver should keep CALC2 (higher tier, and
     # scarcer: annual vs. every_semester) and route around THEO201.
+    # CS210 requires CALC1, which IS satisfied here (see
+    # completed_course_ids below) — see test_solver.py for the
+    # unsatisfied-prerequisite case, which prunes a course out entirely
+    # regardless of how well it otherwise scores.
     calc_2 = Course("CALC2", 4, "annual", unlocks_count=3)
     fitness = Course("FIT101", 1, "every_semester", unlocks_count=0)
     theology = Course("THEO201", 3, "every_semester", unlocks_count=1)
-    data_structures = Course("CS210", 4, "every_semester", unlocks_count=4)
+    data_structures = Course(
+        "CS210", 4, "every_semester", prereq_ids=["CALC1"], unlocks_count=4
+    )
     econ = Course("ECON201", 3, "every_semester", unlocks_count=0)
 
     candidates = [
-        Candidate(calc_2, Section("S1", "CALC2", ("MWF", "9:00")), tier=TIER_MAJOR),
-        Candidate(fitness, Section("S2", "FIT101", ("TR", "11:00")), tier=TIER_GENED),
-        Candidate(theology, Section("S3", "THEO201", ("MWF", "9:00")), tier=TIER_GENED),
-        Candidate(data_structures, Section("S4", "CS210", ("TR", "9:30")), tier=TIER_MAJOR),
-        Candidate(econ, Section("S5", "ECON201", ("MWF", "13:00")), tier=TIER_MINOR),
+        Candidate(calc_2, Section("S1", "CALC2", "MWF", time(9, 0), time(9, 50)), tier=TIER_MAJOR),
+        Candidate(fitness, Section("S2", "FIT101", "TR", time(11, 0), time(11, 50)), tier=TIER_GENED),
+        Candidate(theology, Section("S3", "THEO201", "MWF", time(9, 0), time(9, 50)), tier=TIER_GENED),
+        Candidate(data_structures, Section("S4", "CS210", "TR", time(9, 30), time(10, 45)), tier=TIER_MAJOR),
+        Candidate(econ, Section("S5", "ECON201", "MWF", time(13, 0), time(13, 50)), tier=TIER_MINOR),
     ]
 
-    schedule = solve_semester(candidates)
+    schedule = solve_semester(candidates, completed_course_ids={"CALC1"})
     if schedule:
         total = sum(c.course.credit_hours for c in schedule)
         print(f"Solved schedule ({total} credits):")

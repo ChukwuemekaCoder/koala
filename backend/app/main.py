@@ -4,15 +4,19 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app import cache
 from app.auth import AuthClaims, get_current_auth_user, get_current_student
 from app.config import settings
 from app.db import close_pool, get_pool, init_pool
+from app.routers.schedule import router as schedule_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
+    cache.init_client()
     yield
+    await cache.close_client()
     await close_pool()
 
 
@@ -24,6 +28,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(schedule_router)
 
 
 @app.get("/health")
