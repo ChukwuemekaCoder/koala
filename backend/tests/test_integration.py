@@ -1,10 +1,13 @@
 """
 Real end-to-end integration test: creates one throwaway test user via
 Supabase's Auth Admin API (email_confirm=true — no live inbox needed,
-unlike normal signup), then exercises POST /schedule/optimize,
-GET /schedule/me, and POST /schedule/override through the real FastAPI
-app against the real Supabase Postgres instance, through the real
-auth.users FK chain. Cleans up afterward regardless of outcome.
+unlike normal signup), then walks the real onboarding flow (declare
+programs, bulk-confirm progress) through POST /schedule/optimize,
+GET /schedule/me, POST /schedule/override, and
+PATCH /students/me/progress/{course_id} (cascade entry point B) —
+through the real FastAPI app against the real Supabase Postgres
+instance, through the real auth.users FK chain. Cleans up afterward
+regardless of outcome.
 
 Requires SUPABASE_SERVICE_ROLE_KEY and db/seed_test_catalog.sql applied.
 Skipped automatically if the key isn't set (e.g. in CI before that
@@ -39,6 +42,9 @@ pytestmark = pytest.mark.skipif(
 # without an unmet prerequisite to hit the 12-credit floor).
 CS_PROGRAM_ID = "aaaaaaaa-0000-0000-0000-000000000001"
 MATH_PROGRAM_ID = "aaaaaaaa-0000-0000-0000-000000000002"
+CS110_ID = "bbbbbbbb-0000-0000-0000-000000000001"
+CS210_ID = "bbbbbbbb-0000-0000-0000-000000000002"
+THEO101_ID = "bbbbbbbb-0000-0000-0000-000000000006"
 TEST_EMAIL = "koala-integration-test@oru.edu"
 TEST_PASSWORD = "koala-test-password-CHANGE-1234!"
 
@@ -138,7 +144,7 @@ async def test_user(db_pool):
 
 
 @pytest.mark.asyncio
-async def test_optimize_get_and_override_end_to_end(db_pool, test_user):
+async def test_optimize_get_and_override_end_to_end(test_user):
     user_id = test_user
     access_token = await _sign_in()
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -157,14 +163,52 @@ async def test_optimize_get_and_override_end_to_end(db_pool, test_user):
             assert create_res.status_code == 201
             assert create_res.json()["id"] == user_id
 
-            # No POST /students/me/programs endpoint exists yet (out of
-            # scope — see plan) — declare CS + its required Math minor
-            # directly for this real, FK-backed student.
-            await db_pool.executemany(
-                "insert into student_programs (student_id, program_id) values ($1, $2)",
-                [(user_id, CS_PROGRAM_ID), (user_id, MATH_PROGRAM_ID)],
+            # Onboarding step 1: declare CS + its required Math minor
+            # through the real endpoint (validates against the real
+            # programs catalog).
+            declare_res = await api.post(
+                "/students/me/programs",
+                json={
+                    "programs": [
+                        {"program_id": CS_PROGRAM_ID},
+                        {"program_id": MATH_PROGRAM_ID},
+                    ]
+                },
+                headers=headers,
             )
+            assert declare_res.status_code == 200
+            declared_ids = {p["program_id"] for p in declare_res.json()["programs"]}
+            assert declared_ids == {CS_PROGRAM_ID, MATH_PROGRAM_ID}
 
+            # Onboarding step 3: bulk-confirm course history. CS110 marked
+            # done should be excluded from the generated plan entirely;
+            # THEO101 as not_taken exercises a second entry in the same
+            # bulk call without affecting scheduling.
+            progress_res = await api.post(
+                "/students/me/progress",
+                json={
+                    "progress": [
+                        {"course_id": CS110_ID, "status": "done"},
+                        {"course_id": THEO101_ID, "status": "not_taken"},
+                    ]
+                },
+                headers=headers,
+            )
+            assert progress_res.status_code == 200
+            progress_course_ids = {p["course_id"] for p in progress_res.json()["progress"]}
+            assert progress_course_ids == {CS110_ID, THEO101_ID}
+
+            # Bulk progress confirmation completing is what marks
+            # onboarding done (CLAUDE.md: set on step 3, not step 1).
+            me_res = await api.get("/students/me", headers=headers)
+            assert me_res.status_code == 200
+            assert me_res.json()["onboarding_complete"] is True
+
+            # Optimize's 422 gate is "has declared programs" — the thing
+            # this whole endpoint suite was blocked on until now, since
+            # there was previously no real endpoint to declare them
+            # through. Confirm it succeeds via the real onboarding path,
+            # not just via a direct-SQL workaround.
             optimize_res = await api.post("/schedule/optimize", headers=headers)
             assert optimize_res.status_code == 200
             plan = optimize_res.json()
@@ -174,6 +218,15 @@ async def test_optimize_get_and_override_end_to_end(db_pool, test_user):
             assert first_semester["total_credits"] >= 12
             first_term = first_semester["term"]
             optimized_course_ids = {c["course_id"] for c in first_semester["courses"]}
+
+            # CS110 was marked 'done' — it must not appear anywhere in
+            # the generated plan, in any semester.
+            all_plan_course_ids = {
+                c["course_id"]
+                for semester in plan["semesters"]
+                for c in semester["courses"]
+            }
+            assert CS110_ID not in all_plan_course_ids
 
             # GET /schedule/me should return exactly what optimize persisted.
             get_res = await api.get(
@@ -215,6 +268,36 @@ async def test_optimize_get_and_override_end_to_end(db_pool, test_user):
                 )
                 assert course_to_remove not in {
                     c["course_id"] for c in get_res_3.json()["courses"]
+                }
+
+            # Retroactive correction (cascade entry point B): mark CS210
+            # done directly via PATCH, as if the student forgot to record
+            # it earlier — CLAUDE.md's own example for this trigger. This
+            # re-solves ALL future uncommitted semesters from the current
+            # term forward (not just the override's narrower blast
+            # radius), so CS210 must disappear from wherever it now
+            # would have been scheduled.
+            patch_res = await api.patch(
+                f"/students/me/progress/{CS210_ID}",
+                json={"status": "done"},
+                headers=headers,
+            )
+            assert patch_res.status_code == 200
+            corrected_plan = patch_res.json()
+            corrected_course_ids = {
+                c["course_id"]
+                for semester in corrected_plan["semesters"]
+                for c in semester["courses"]
+            }
+            assert CS210_ID not in corrected_course_ids
+
+            # And the correction is visible through the read path too.
+            for semester in corrected_plan["semesters"]:
+                get_after_patch = await api.get(
+                    "/schedule/me", params={"term": semester["term"]}, headers=headers
+                )
+                assert CS210_ID not in {
+                    c["course_id"] for c in get_after_patch.json()["courses"]
                 }
     finally:
         await cache.close_client()

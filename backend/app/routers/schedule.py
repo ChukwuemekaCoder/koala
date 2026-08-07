@@ -84,6 +84,29 @@ async def _persist_cascade_result(
             )
 
 
+async def _cleanup_orphaned_terms(
+    student_id: str, touched_terms: set[str]
+) -> None:
+    """
+    A fresh full re-solve (optimize, or a cascade-B retroactive
+    correction) can produce a shorter plan than what existed before
+    (e.g. after requirements changed) — clean up now-orphaned choosable
+    rows in terms the new plan didn't touch. Locked rows are left alone;
+    they're hard constraints the student set explicitly.
+    """
+    pool = get_pool()
+    existing_terms = await pool.fetch(
+        "select distinct term from semester_plans where student_id = $1", student_id
+    )
+    for row in existing_terms:
+        if row["term"] not in touched_terms:
+            await pool.execute(
+                "delete from semester_plans where student_id = $1 and term = $2 and is_locked = false",
+                student_id,
+                row["term"],
+            )
+
+
 @router.post("/optimize")
 async def optimize(student: dict = Depends(get_current_student)) -> dict:
     student_id = str(student["id"])
@@ -98,23 +121,7 @@ async def optimize(student: dict = Depends(get_current_student)) -> dict:
     start_term = cascade.current_term_label(student.get("current_term"))
     result = await cascade.resolve_from_term(pool, student_id, start_term)
     await _persist_cascade_result(student_id, result)
-
-    # A fresh optimize can produce a shorter plan than what existed
-    # before (e.g. after requirements changed) — clean up now-orphaned
-    # choosable rows in terms the new plan didn't touch. Locked rows are
-    # left alone; they're hard constraints the student set explicitly.
-    touched_terms = {s.term for s in result.semesters}
-    existing_terms = await pool.fetch(
-        "select distinct term from semester_plans where student_id = $1", student_id
-    )
-    for row in existing_terms:
-        if row["term"] not in touched_terms:
-            await pool.execute(
-                "delete from semester_plans where student_id = $1 and term = $2 and is_locked = false",
-                student_id,
-                row["term"],
-            )
-
+    await _cleanup_orphaned_terms(student_id, {s.term for s in result.semesters})
     await cache.invalidate_schedule_cache(student_id)
     return _serialize_cascade(result)
 

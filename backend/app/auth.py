@@ -11,6 +11,14 @@ from app.db import get_pool
 _bearer_scheme = HTTPBearer(auto_error=True)
 _jwk_client = PyJWKClient(f"{settings.supabase_url}/auth/v1/.well-known/jwks.json")
 
+# PyJWT validates iat/nbf/exp with zero leeway by default, which is too
+# strict for verifying a token issued by a separate remote service (our
+# clock and Supabase's auth server's clock are never going to agree to
+# the second) — found via a real ImmatureSignatureError against a live
+# token, not a hypothetical. 10s comfortably covers normal clock drift
+# without meaningfully weakening expiry enforcement.
+_CLOCK_SKEW_LEEWAY_SECONDS = 10
+
 
 @dataclass
 class AuthClaims:
@@ -35,6 +43,7 @@ async def get_current_auth_user(
             algorithms=["ES256", "RS256"],
             audience="authenticated",
             issuer=f"{settings.supabase_url}/auth/v1",
+            leeway=_CLOCK_SKEW_LEEWAY_SECONDS,
         )
     except jwt.PyJWTError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
