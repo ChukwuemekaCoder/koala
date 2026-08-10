@@ -10,6 +10,11 @@
 -- all applicable requirement rows" rule. CS110/THEO101 deliberately
 -- clash in Fall <year> so tests can exercise real conflict-avoidance
 -- against DB-sourced data, matching the scheduler sketch's own example.
+-- ART100 has TWO sections in the current term — one clashes with
+-- HIST101 (MWF 13:00), one doesn't (TR 13:00) — so tests can exercise
+-- CLAUDE.md's "Multiple sections per course": the solver must offer
+-- both as candidates, never schedule both at once, and pick the
+-- non-conflicting one when both ART100 and HIST101 are wanted.
 --
 -- Terms are computed relative to real current date so a solve run
 -- against "the current term" actually finds sections. Re-run this
@@ -83,7 +88,7 @@ insert into degree_requirements (program_id, course_id, category) values
     ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002', 'major_core'),
     ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000003', 'major_core'),
     ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000005', 'major_core'),
-    ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000006', 'christian_coursework'),
+    ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000006', 'gen_ed'),
     ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000007', 'gen_ed'),
     ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000008', 'gen_ed'),
     ('aaaaaaaa-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000004', 'minor'),
@@ -121,6 +126,14 @@ insert into sections (course_id, term, days, start_time, end_time, seats_total) 
           else 'Fall ' || extract(year from now())::int end,
      'TR', '13:00', '14:15', 30),
     ('bbbbbbbb-0000-0000-0000-000000000008',
+     case when extract(month from now()) between 1 and 7
+          then 'Spring ' || extract(year from now())::int
+          else 'Fall ' || extract(year from now())::int end,
+     'MWF', '13:00', '13:50', 30),
+    -- ART100's second current-term section — same MWF 13:00 slot as
+    -- HIST101 above, deliberately conflicting (its other section,
+    -- TR 13:00-14:15, does not conflict with HIST101).
+    ('bbbbbbbb-0000-0000-0000-000000000009',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,

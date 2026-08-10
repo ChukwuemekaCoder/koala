@@ -156,6 +156,21 @@ async def test_term_candidates_built_from_real_sections(db_pool):
 
 
 @pytest.mark.asyncio
+async def test_term_candidates_include_every_section_of_a_multi_section_course(db_pool):
+    remaining = await _remaining_requirements_for_declared_programs(
+        db_pool, FAKE_STUDENT_ID, [ART]
+    )
+    candidates = await load_term_candidates(db_pool, remaining, "Fall 2026")
+    art100_candidates = [c for c in candidates if c.course.id == ART100]
+    # ART100 has two Fall 2026 sections (MWF 13:00 and TR 13:00) — both
+    # must come back as separate candidates, not collapsed to one, so
+    # the solver actually gets to choose between them (see CLAUDE.md's
+    # "Multiple sections per course").
+    assert len(art100_candidates) == 2
+    assert {c.section.days for c in art100_candidates} == {"MWF", "TR"}
+
+
+@pytest.mark.asyncio
 async def test_term_candidates_exclude_list_is_respected(db_pool):
     remaining = await _remaining_requirements_for_declared_programs(
         db_pool, FAKE_STUDENT_ID, [CS]

@@ -1,5 +1,53 @@
 # ORU Scheduling Engine — Project Spec
 
+## Scope: undergraduate students only
+
+koala v1 is scoped to undergraduate ORU students only. `students.class_standing`
+uses undergraduate-only vocabulary (freshman/sophomore/junior/senior), and
+graduate programs at ORU don't share undergraduate's gen-ed/Christian-
+coursework core structure — they would need a genuinely different
+requirement model, not a relabeled version of this one. Supporting both
+was considered and deliberately deferred rather than attempted in v1.
+
+## Onboarding data sourcing
+
+Majors and minors are manually encoded into `programs` from ORU's real
+public catalog — not scraped. The list is small (ORU has 150+ majors,
+minors, and pre-professional programs total) and changes rarely, making
+a one-time manual compilation more appropriate than scraper
+infrastructure (fragile against site changes, no formal API, ToS
+considerations for automated access to catalog pages).
+
+- **Minors**: ORU publishes a complete, current table at
+  https://oru.edu/admissions/minors.php — 41 minors with department,
+  pulled directly during design (Aug 2026). Seed `programs` (type
+  `'minor'`) from this table directly.
+- **Majors**: no equivalent single flat list — closest source is
+  individual degree plan PDFs at https://degreeplansheets.oru.edu
+  (ORU's Degree Works portal). Per the original schema design decision,
+  only 2-3 real majors need to be manually encoded for v1 — pick from
+  this source rather than attempting to enumerate ORU's full major list.
+- **Sections (class times)**: fundamentally different sourcing problem
+  from majors/minors — offerings and time slots change every semester,
+  and ORU's actual per-semester "Schedule of Classes" (specific section
+  meeting times) sits behind a student portal login, not on the open
+  web. Do NOT attempt to scrape or automate against any login-walled
+  registration system — same principle as never touching real student
+  records. `sections` data is hand-built synthetic data (see
+  `db/seed_test_catalog.sql` for the established pattern), designed to
+  behave realistically (including deliberate conflicts) without
+  claiming to be ORU's actual live timetable. Course codes/titles/credit
+  hours can optionally be pulled from the public catalog at
+  catalog.oru.edu for authenticity — that's genuinely public, same
+  category as the minors page — but section meeting times stay
+  invented/representative.
+
+Worth knowing for context (not a build requirement): ORU has already
+moved to Degree Works for official degree tracking through the
+registrar. koala isn't competing with or replacing it — it demonstrates
+constraint-based multi-semester scheduling that Degree Works-style tools
+typically don't do.
+
 ## What this is
 
 A degree-audit and constraint-based schedule optimizer for Oral Roberts
@@ -120,7 +168,9 @@ requirement or time slot, it uses a tiered priority, highest first:
    majors default to equal priority (v1). `student_programs.priority_rank`
    exists for a student to optionally rank them, but is not required.
 3. **Elective/free-standing minors** — not required by any declared major.
-4. **Gen-ed / Christian coursework.**
+4. **Gen-eds** — includes ORU's Christian coursework requirements; these
+   aren't a separate category in the schema, they're part of the gen-ed
+   core (`degree_requirements.category = 'gen_ed'` covers both).
 
 ### Bottleneck score (tiebreaker within a tier)
 
@@ -166,6 +216,31 @@ between two majors — they're equal by design in v1).
 
 ---
 
+## Multiple sections per course
+
+A course can have more than one `sections` row in the same term (e.g.
+CS 210 offered both MWF 9am and TR 2pm). These are NOT independent
+requirement slots — they're mutually exclusive alternatives for
+satisfying that one course's requirement. The solver must:
+
+1. Treat every section of the same course as alternative candidates,
+   never add more than one section of the same `course_id` to a single
+   semester's plan.
+2. When multiple sections of a course are viable (no conflict with
+   already-chosen courses), prefer whichever section actually produces
+   the best overall schedule — i.e. the one that avoids conflicts with
+   other high-priority courses, or that best supports fitting more
+   required courses into the semester — not just the first one
+   encountered in an arbitrary order.
+
+This is real optimization surface the backtracking search needs to
+cover, not just "pick any section of a required course." Verify
+`catalog.py`'s candidate-building step actually generates one candidate
+per section (not one per course, collapsing options prematurely), and
+that the backtracking search in `scheduler_backtracking_sketch.py`
+correctly excludes sibling sections of an already-chosen course from
+the remaining candidate pool once one is picked.
+
 ## The solver (backtracking algorithm)
 
 Solves one semester at a time. Reference implementation/sketch already
@@ -192,8 +267,8 @@ Known gaps in the reference sketch, to be completed during implementation:
   (reject a candidate if its prerequisites aren't satisfied per
   `student_progress` + already-chosen courses in earlier semesters).
 - Cycle detection for the prerequisite graph is NOT enforced at the DB
-  level (Postgres can't easily express "no cycles" as a constraint) —
-  must be handled in application code when the dependency graph is built.
+  level (Postgres can't easily express "no cycles" as a constraint) — must
+  be handled in application code when the dependency graph is built.
 
 ---
 

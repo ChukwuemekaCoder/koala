@@ -180,7 +180,18 @@ def _backtrack(
     next_candidate, *rest = remaining
 
     # --- Branch 1: try INCLUDING this candidate ---
-    conflict = any(
+    # A course can have multiple sections as candidates (mutually
+    # exclusive alternatives, not independent requirement slots — see
+    # CLAUDE.md's "Multiple sections per course"). If this course is
+    # already satisfied by a section chosen earlier in the search,
+    # this candidate is never includable, same as a time conflict —
+    # falling through to the exclude-branch below naturally advances
+    # to the next candidate, which is how an alternate section of a
+    # DIFFERENT course still gets a fair try.
+    already_scheduled = any(
+        c.course.id == next_candidate.course.id for c in chosen
+    )
+    conflict = already_scheduled or any(
         has_time_conflict(next_candidate.section, c.section) for c in chosen
     )
     prereqs_ok = prerequisites_satisfied(next_candidate.course, completed_course_ids)

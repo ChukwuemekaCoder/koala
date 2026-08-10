@@ -69,7 +69,7 @@ create table degree_requirements (
     program_id uuid not null references programs(id) on delete cascade,
     course_id uuid not null references courses(id),
     category text not null check (category in
-        ('major_core', 'major_elective', 'minor', 'gen_ed', 'christian_coursework')),
+        ('major_core', 'major_elective', 'minor', 'gen_ed')),
     unique (program_id, course_id, category)
 );
 

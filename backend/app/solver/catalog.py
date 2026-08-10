@@ -19,7 +19,7 @@ from app.solver.scheduler_backtracking_sketch import (
 )
 
 _MAJOR_CATEGORIES = {"major_core", "major_elective"}
-_GENED_CATEGORIES = {"gen_ed", "christian_coursework"}
+_GENED_CATEGORIES = {"gen_ed"}
 
 _TIER_TO_CATEGORY = {
     TIER_MAJOR: "major",
@@ -261,10 +261,17 @@ async def load_term_candidates(
     exclude_course_ids: frozenset[str] = frozenset(),
 ) -> list[Candidate]:
     """
-    One Candidate per remaining, non-excluded required course that has a
-    section offered this term. If a course has multiple sections in the
-    term, picks one deterministically (lowest section id) — the core
-    solver assumes exactly one section per course per candidate set.
+    One Candidate per (remaining, non-excluded required course, section)
+    pair offered this term. A course with multiple same-term sections
+    produces multiple candidates — they're mutually exclusive
+    alternatives for satisfying that course's requirement, not
+    independent slots (see CLAUDE.md's "Multiple sections per course").
+    The backtracking search is responsible for never choosing more than
+    one candidate with the same course_id in a single semester
+    (_backtrack's same-course guard) and for preferring whichever
+    section actually produces a valid schedule via its normal
+    include/exclude/backtrack exploration — this function just needs to
+    make every real alternative visible to it.
     """
     course_ids = [
         cid for cid in remaining if cid not in exclude_course_ids
@@ -274,8 +281,7 @@ async def load_term_candidates(
 
     rows = await pool.fetch(
         """
-        select distinct on (course_id)
-            id, course_id, days, start_time, end_time
+        select id, course_id, days, start_time, end_time
         from sections
         where term = $1 and course_id = any($2::uuid[])
         order by course_id, id

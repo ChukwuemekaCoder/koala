@@ -176,6 +176,34 @@ Built and locked during design (see chat history for full mockups):
    blocks, lock icons on manually-overridden courses, and a caption
    explaining why a semester is flagged.
 
+- **Search-then-chip pattern**: for any multi-select from a large list
+  (majors, minors, and likely course search in onboarding step 3) — a
+  search input filters a live results dropdown; selecting a result adds
+  it as a solid teal chip above the search box, removable via an `×`.
+  Do NOT render all options as always-visible chips — this was tried for
+  program selection with ~41 real minors and was correctly identified as
+  unusable at that scale. Auto-derived selections (e.g. a structurally-
+  required minor added because of the student's major) get a visually
+  distinct chip variant: outlined instead of filled, with an info icon
+  and inline explanation, since it's not a normal removable choice in
+  the same sense.
+
+- **Course history two-state tag**: onboarding step 3 uses only two
+  selectable tags per course — Done, In progress. "Not taken" is NOT a
+  selectable option; it's the implicit default for any untouched course
+  (and drives the dimming behavior). Clicking an already-active tag
+  toggles it back off (returns to not-taken/dimmed) rather than
+  requiring a separate "clear" action.
+- **Live in-place filtering vs. search-then-add**: step 1's program
+  search (empty list, search to find and add) and step 3's course
+  search (full list always visible, search narrows what's shown) are
+  different patterns — don't conflate them. Step 3's search filters the
+  already-visible grouped list live as the student types (hide
+  non-matching rows, collapse a category header entirely if nothing in
+  it survives the filter) — it does NOT open a separate results
+  dropdown. Category pills (All/Major/Minor/Christian coursework, etc.)
+  combine with the text filter rather than replacing it.
+
 ## Known gaps — not yet designed
 
 - **Credit-hour bound blocked state**: the UI for what happens when a

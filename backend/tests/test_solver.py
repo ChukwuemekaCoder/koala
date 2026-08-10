@@ -231,6 +231,35 @@ def test_conflicting_sections_only_one_gets_scheduled():
     assert "B" not in ids
 
 
+def test_only_one_section_of_the_same_course_is_ever_scheduled():
+    # Two sections of the same course, at different times — neither
+    # conflicts with the other, so nothing time-wise stops both from
+    # being included unless the solver explicitly treats them as
+    # mutually exclusive alternatives for one requirement, not two
+    # independent slots (see CLAUDE.md's "Multiple sections per course").
+    b1 = _candidate("B", 3, tier=TIER_MAJOR, days="MWF", start="9:00", end="9:50")
+    b2 = _candidate("B", 3, tier=TIER_MAJOR, days="TR", start="11:00", end="11:50")
+    result = solve_semester([b1, b2], min_credits=0)
+    assert result is not None
+    chosen_ids = [c.course.id for c in result]
+    assert chosen_ids.count("B") == 1
+
+
+def test_alternate_section_scheduled_when_first_conflicts_with_higher_priority():
+    a = _candidate("A", 4, tier=TIER_MAJOR, days="MWF", start="9:00", end="9:50")
+    # B's first-listed section clashes with A; its second doesn't — the
+    # solver should still schedule B via the alternate section rather
+    # than dropping it just because its first section was unusable.
+    b_conflicting = _candidate("B", 3, tier=TIER_GENED, days="MWF", start="9:00", end="9:50")
+    b_alternate = _candidate("B", 3, tier=TIER_GENED, days="TR", start="11:00", end="11:50")
+    result = solve_semester([a, b_conflicting, b_alternate], min_credits=0)
+    assert result is not None
+    ids = {c.course.id for c in result}
+    assert ids == {"A", "B"}
+    chosen_b = next(c for c in result if c.course.id == "B")
+    assert chosen_b.section.days == "TR"  # the non-conflicting alternate, not the first section
+
+
 def test_course_with_unsatisfied_prerequisite_is_excluded():
     needs_prereq = _candidate(
         "ADV", 9, freq="biennial", tier=TIER_MAJOR, prereq_ids=["INTRO"], start="8:00", end="8:50"
