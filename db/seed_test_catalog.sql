@@ -14,7 +14,13 @@
 -- HIST101 (MWF 13:00), one doesn't (TR 13:00) — so tests can exercise
 -- CLAUDE.md's "Multiple sections per course": the solver must offer
 -- both as candidates, never schedule both at once, and pick the
--- non-conflicting one when both ART100 and HIST101 are wanted.
+-- non-conflicting one when both ART100 and HIST101 are wanted. The
+-- conflicting ART100 section is ALSO split into two section_meetings
+-- rows (MW 13:00 + a standalone F 15:00) — the multi-meeting example
+-- CLAUDE.md's "Real day/time overlap logic (updated —
+-- section_meetings)" describes (one section, more than one meeting
+-- pattern). The MW meeting alone still conflicts with HIST101, so
+-- this doesn't change which section the solver ends up preferring.
 --
 -- Terms are computed relative to real current date so a solve run
 -- against "the current term" actually finds sections. Re-run this
@@ -98,72 +104,94 @@ insert into degree_requirements (program_id, course_id, category) values
 
 -- Sections, computed relative to real current date so "the current
 -- term" resolves to something with real offerings. CS110/THEO101
--- deliberately clash (MWF 9:00-9:50) in the fall term.
-insert into sections (course_id, term, days, start_time, end_time, seats_total) values
-    ('bbbbbbbb-0000-0000-0000-000000000001',
+-- deliberately clash (MWF 9:00-9:50) in the fall term. Fixed UUIDs
+-- (cccc- prefix, matching aaaa-/bbbb- for programs/courses) so
+-- section_meetings rows below can reference them directly.
+insert into sections (id, course_id, term, seats_total) values
+    ('cccccccc-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000001',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'MWF', '09:00', '09:50', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000006',
+     30),
+    ('cccccccc-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000006',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'MWF', '09:00', '09:50', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000004',
+     30),
+    ('cccccccc-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000004',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'TR', '09:30', '10:45', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000007',
+     30),
+    ('cccccccc-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000007',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'MWF', '11:00', '11:50', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000009',
+     30),
+    ('cccccccc-0000-0000-0000-000000000005', 'bbbbbbbb-0000-0000-0000-000000000009',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'TR', '13:00', '14:15', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000008',
+     30),
+    ('cccccccc-0000-0000-0000-000000000006', 'bbbbbbbb-0000-0000-0000-000000000008',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'MWF', '13:00', '13:50', 30),
-    -- ART100's second current-term section — same MWF 13:00 slot as
-    -- HIST101 above, deliberately conflicting (its other section,
-    -- TR 13:00-14:15, does not conflict with HIST101).
-    ('bbbbbbbb-0000-0000-0000-000000000009',
+     30),
+    -- ART100's second current-term section — the one that conflicts
+    -- with HIST101, and the one split into two meetings below.
+    ('cccccccc-0000-0000-0000-000000000007', 'bbbbbbbb-0000-0000-0000-000000000009',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
           else 'Fall ' || extract(year from now())::int end,
-     'MWF', '13:00', '13:50', 30),
+     30),
     -- next term (fall -> spring of next year, or spring -> fall same year)
-    ('bbbbbbbb-0000-0000-0000-000000000002',
+    ('cccccccc-0000-0000-0000-000000000008', 'bbbbbbbb-0000-0000-0000-000000000002',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
           else 'Spring ' || (extract(year from now())::int + 1) end,
-     'TR', '09:30', '10:45', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000005',
+     30),
+    ('cccccccc-0000-0000-0000-000000000009', 'bbbbbbbb-0000-0000-0000-000000000005',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
           else 'Spring ' || (extract(year from now())::int + 1) end,
-     'MWF', '10:00', '10:50', 30),
-    ('bbbbbbbb-0000-0000-0000-000000000010',
+     30),
+    ('cccccccc-0000-0000-0000-000000000010', 'bbbbbbbb-0000-0000-0000-000000000010',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
           else 'Spring ' || (extract(year from now())::int + 1) end,
-     'TR', '11:00', '12:15', 30),
+     30),
     -- term after next: CS310 needs CS210 (seeded in the "next term"
     -- bucket above), so it can't be schedulable any earlier than a
     -- third term without violating its own prerequisite. Without this
     -- row CS310 has zero sections ever, which is a required major_core
     -- course that can never be scheduled — the walk-forward cascade
     -- would spin through all MAX_SEMESTERS terms looking for it.
-    ('bbbbbbbb-0000-0000-0000-000000000003',
+    ('cccccccc-0000-0000-0000-000000000011', 'bbbbbbbb-0000-0000-0000-000000000003',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || (extract(year from now())::int + 1)
           else 'Fall ' || (extract(year from now())::int + 1) end,
-     'MWF', '10:00', '10:50', 30);
+     30);
+
+-- Meeting patterns. One row per section, except section 0007 (ART100's
+-- conflicting section), which gets two — a lecture-style MW block plus
+-- a standalone Friday block, mirroring the real CSC 255 lecture-plus-
+-- discussion example. The MW meeting alone already conflicts with
+-- HIST101 (0006, MWF 13:00-13:50), so this doesn't change which
+-- section the solver prefers — it only proves the conflict check
+-- correctly walks every meeting pair, not just the first.
+insert into section_meetings (section_id, days, start_time, end_time) values
+    ('cccccccc-0000-0000-0000-000000000001', 'MWF', '09:00', '09:50'),
+    ('cccccccc-0000-0000-0000-000000000002', 'MWF', '09:00', '09:50'),
+    ('cccccccc-0000-0000-0000-000000000003', 'TR', '09:30', '10:45'),
+    ('cccccccc-0000-0000-0000-000000000004', 'MWF', '11:00', '11:50'),
+    ('cccccccc-0000-0000-0000-000000000005', 'TR', '13:00', '14:15'),
+    ('cccccccc-0000-0000-0000-000000000006', 'MWF', '13:00', '13:50'),
+    ('cccccccc-0000-0000-0000-000000000007', 'MW', '13:00', '13:50'),
+    ('cccccccc-0000-0000-0000-000000000007', 'F', '15:00', '15:50'),
+    ('cccccccc-0000-0000-0000-000000000008', 'TR', '09:30', '10:45'),
+    ('cccccccc-0000-0000-0000-000000000009', 'MWF', '10:00', '10:50'),
+    ('cccccccc-0000-0000-0000-000000000010', 'TR', '11:00', '12:15'),
+    ('cccccccc-0000-0000-0000-000000000011', 'MWF', '10:00', '10:50');
 
 commit;

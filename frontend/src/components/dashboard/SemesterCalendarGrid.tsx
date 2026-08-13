@@ -54,28 +54,31 @@ export function SemesterCalendarGrid({ semester }: { semester: Semester }) {
         <div className="calendar-grid-body">
           {DAYS.map((day) => (
             <div className="calendar-grid-day-col" key={day}>
-              {semester.courses
-                .filter((course) => course.days.includes(day))
-                .map((course) => {
-                  const startMin = timeToMinutes(course.start_time);
-                  const endMin = timeToMinutes(course.end_time);
-                  const top = ((startMin - GRID_START_MIN) / GRID_RANGE_MIN) * 100;
-                  const height = ((endMin - startMin) / GRID_RANGE_MIN) * 100;
-                  return (
-                    <div
-                      key={`${course.course_id}-${day}`}
-                      className={`calendar-block ${blockColorClass(course)}`}
-                      style={{
-                        top: `${top}%`,
-                        height: `${Math.max(height, 4)}%`,
-                      }}
-                      title={`${course.title} — ${course.start_time.slice(0, 5)}–${course.end_time.slice(0, 5)}`}
-                    >
-                      {course.is_locked && <IconLock size={12} stroke={2} />}
-                      <span>{course.code}</span>
-                    </div>
-                  );
-                })}
+              {semester.courses.flatMap((course) =>
+                course.meetings
+                  .map((meeting, meetingIndex) => ({ meeting, meetingIndex }))
+                  .filter(({ meeting }) => meeting.days.includes(day))
+                  .map(({ meeting, meetingIndex }) => {
+                    const startMin = timeToMinutes(meeting.start_time);
+                    const endMin = timeToMinutes(meeting.end_time);
+                    const top = ((startMin - GRID_START_MIN) / GRID_RANGE_MIN) * 100;
+                    const height = ((endMin - startMin) / GRID_RANGE_MIN) * 100;
+                    return (
+                      <div
+                        key={`${course.course_id}-${meetingIndex}-${day}`}
+                        className={`calendar-block ${blockColorClass(course)}`}
+                        style={{
+                          top: `${top}%`,
+                          height: `${Math.max(height, 4)}%`,
+                        }}
+                        title={`${course.title} — ${meeting.start_time.slice(0, 5)}–${meeting.end_time.slice(0, 5)}`}
+                      >
+                        {course.is_locked && <IconLock size={12} stroke={2} />}
+                        <span>{course.code}</span>
+                      </div>
+                    );
+                  }),
+              )}
             </div>
           ))}
         </div>

@@ -15,6 +15,7 @@ from app.solver.scheduler_backtracking_sketch import (
     TIER_MINOR,
     Candidate,
     Course,
+    Meeting,
     Section,
 )
 
@@ -266,12 +267,16 @@ async def load_term_candidates(
     produces multiple candidates — they're mutually exclusive
     alternatives for satisfying that course's requirement, not
     independent slots (see CLAUDE.md's "Multiple sections per course").
-    The backtracking search is responsible for never choosing more than
-    one candidate with the same course_id in a single semester
-    (_backtrack's same-course guard) and for preferring whichever
-    section actually produces a valid schedule via its normal
-    include/exclude/backtrack exploration — this function just needs to
-    make every real alternative visible to it.
+    Each section can itself have more than one meeting pattern (see
+    "Real day/time overlap logic (updated — section_meetings)") — rows
+    come back one-per-meeting and are grouped into a single Section per
+    section_id before building candidates. The backtracking search is
+    responsible for never choosing more than one candidate with the
+    same course_id in a single semester (_backtrack's same-course
+    guard) and for preferring whichever section actually produces a
+    valid schedule via its normal include/exclude/backtrack
+    exploration — this function just needs to make every real
+    alternative visible to it.
     """
     course_ids = [
         cid for cid in remaining if cid not in exclude_course_ids
@@ -281,26 +286,33 @@ async def load_term_candidates(
 
     rows = await pool.fetch(
         """
-        select id, course_id, days, start_time, end_time
-        from sections
-        where term = $1 and course_id = any($2::uuid[])
-        order by course_id, id
+        select se.id as section_id, se.course_id,
+               sm.days, sm.start_time, sm.end_time
+        from sections se
+        join section_meetings sm on sm.section_id = se.id
+        where se.term = $1 and se.course_id = any($2::uuid[])
+        order by se.course_id, se.id, sm.start_time
         """,
         term,
         course_ids,
     )
 
-    candidates = []
+    sections_by_id: dict[str, Section] = {}
+    course_id_by_section: dict[str, str] = {}
     for row in rows:
-        course_id = str(row["course_id"])
-        required = remaining[course_id]
-        section = Section(
-            id=str(row["id"]),
-            course_id=course_id,
-            days=row["days"],
-            start_time=row["start_time"],
-            end_time=row["end_time"],
+        section_id = str(row["section_id"])
+        section = sections_by_id.get(section_id)
+        if section is None:
+            section = Section(id=section_id, course_id=str(row["course_id"]))
+            sections_by_id[section_id] = section
+            course_id_by_section[section_id] = str(row["course_id"])
+        section.meetings.append(
+            Meeting(days=row["days"], start_time=row["start_time"], end_time=row["end_time"])
         )
+
+    candidates = []
+    for section_id, section in sections_by_id.items():
+        required = remaining[course_id_by_section[section_id]]
         candidates.append(Candidate(course=required.course, section=section, tier=required.tier))
     return candidates
 
@@ -313,46 +325,56 @@ async def load_locked_candidates(
 ) -> list[Candidate]:
     """
     Existing manually-overridden (is_locked) semester_plans rows for this
-    student+term, rebuilt as hard-constraint Candidates.
+    student+term, rebuilt as hard-constraint Candidates. Rows come back
+    one-per-meeting (see load_term_candidates) and are grouped into one
+    Section per section_id before building candidates.
     """
     rows = await pool.fetch(
         """
-        select se.id as section_id, se.course_id, se.days, se.start_time, se.end_time,
+        select se.id as section_id, se.course_id,
+               sm.days, sm.start_time, sm.end_time,
                c.code, c.title, c.credit_hours, c.offering_frequency
         from semester_plans sp
         join sections se on se.id = sp.section_id
+        join section_meetings sm on sm.section_id = se.id
         join courses c on c.id = se.course_id
         where sp.student_id = $1 and sp.term = $2 and sp.is_locked = true
+        order by se.id, sm.start_time
         """,
         student_id,
         term,
     )
 
-    candidates = []
+    sections_by_id: dict[str, Section] = {}
+    candidates_by_id: dict[str, Candidate] = {}
     for row in rows:
-        course_id = str(row["course_id"])
-        required = remaining.get(course_id)
-        if required is not None:
-            course = required.course
-            tier = required.tier
-        else:
-            # Locked but no longer tied to a remaining requirement (e.g.
-            # satisfied elsewhere already) — tier is irrelevant since
-            # locked candidates always sort first regardless of tier.
-            course = Course(
-                id=course_id,
-                code=row["code"],
-                title=row["title"],
-                credit_hours=row["credit_hours"],
-                offering_frequency=row["offering_frequency"],
+        section_id = str(row["section_id"])
+        section = sections_by_id.get(section_id)
+        if section is None:
+            course_id = str(row["course_id"])
+            required = remaining.get(course_id)
+            if required is not None:
+                course = required.course
+                tier = required.tier
+            else:
+                # Locked but no longer tied to a remaining requirement
+                # (e.g. satisfied elsewhere already) — tier is
+                # irrelevant since locked candidates always sort first
+                # regardless of tier.
+                course = Course(
+                    id=course_id,
+                    code=row["code"],
+                    title=row["title"],
+                    credit_hours=row["credit_hours"],
+                    offering_frequency=row["offering_frequency"],
+                )
+                tier = TIER_GENED
+            section = Section(id=section_id, course_id=course_id)
+            sections_by_id[section_id] = section
+            candidates_by_id[section_id] = Candidate(
+                course=course, section=section, tier=tier, locked=True
             )
-            tier = TIER_GENED
-        section = Section(
-            id=str(row["section_id"]),
-            course_id=course_id,
-            days=row["days"],
-            start_time=row["start_time"],
-            end_time=row["end_time"],
+        section.meetings.append(
+            Meeting(days=row["days"], start_time=row["start_time"], end_time=row["end_time"])
         )
-        candidates.append(Candidate(course=course, section=section, tier=tier, locked=True))
-    return candidates
+    return list(candidates_by_id.values())

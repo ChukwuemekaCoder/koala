@@ -23,9 +23,14 @@ def _serialize_candidate(
         "credit_hours": candidate.course.credit_hours,
         "category": category,
         "section_id": candidate.section.id,
-        "days": candidate.section.days,
-        "start_time": candidate.section.start_time.isoformat(),
-        "end_time": candidate.section.end_time.isoformat(),
+        "meetings": [
+            {
+                "days": m.days,
+                "start_time": m.start_time.isoformat(),
+                "end_time": m.end_time.isoformat(),
+            }
+            for m in candidate.section.meetings
+        ],
         "is_locked": candidate.locked,
         "is_flagged": is_flagged,
         "flag_reason": flag_reason,
@@ -298,22 +303,43 @@ async def override(
     return _serialize_cascade(result, categories=categories, flagged_terms=flagged_terms)
 
 
-def _row_to_course_dict(r: dict, categories: dict[str, str]) -> dict:
-    course_id = str(r["course_id"])
-    return {
-        "course_id": course_id,
-        "code": r["code"],
-        "title": r["title"],
-        "credit_hours": r["credit_hours"],
-        "category": categories.get(course_id, "major"),
-        "section_id": str(r["section_id"]),
-        "days": r["days"],
-        "start_time": r["start_time"].isoformat(),
-        "end_time": r["end_time"].isoformat(),
-        "is_locked": r["is_locked"],
-        "is_flagged": r["is_flagged"],
-        "flag_reason": r["flag_reason"],
-    }
+def _group_meetings_by_section(rows: list[dict], categories: dict[str, str]) -> list[dict]:
+    """
+    Groups flat (one-row-per-meeting) SQL rows into one course dict per
+    section, folding each row's single meeting into a `meetings` list —
+    mirrors catalog.py's section-grouping, needed because
+    section_meetings is one-to-many off sections (see CLAUDE.md's
+    "Real day/time overlap logic (updated — section_meetings)").
+    Preserves row order, so callers should ORDER BY section_id then a
+    meeting-level column.
+    """
+    sections: dict[str, dict] = {}
+    for r in rows:
+        section_id = str(r["section_id"])
+        course = sections.get(section_id)
+        if course is None:
+            course_id = str(r["course_id"])
+            course = {
+                "course_id": course_id,
+                "code": r["code"],
+                "title": r["title"],
+                "credit_hours": r["credit_hours"],
+                "category": categories.get(course_id, "major"),
+                "section_id": section_id,
+                "meetings": [],
+                "is_locked": r["is_locked"],
+                "is_flagged": r["is_flagged"],
+                "flag_reason": r["flag_reason"],
+            }
+            sections[section_id] = course
+        course["meetings"].append(
+            {
+                "days": r["days"],
+                "start_time": r["start_time"].isoformat(),
+                "end_time": r["end_time"].isoformat(),
+            }
+        )
+    return list(sections.values())
 
 
 @router.get("/me")
@@ -329,17 +355,19 @@ async def get_schedule(term: str, student: dict = Depends(get_current_student)) 
         """
         select sp.section_id, sp.is_locked, sp.is_flagged, sp.flag_reason,
                c.id as course_id, c.code, c.title, c.credit_hours,
-               se.days, se.start_time, se.end_time
+               sm.days, sm.start_time, sm.end_time
         from semester_plans sp
         join sections se on se.id = sp.section_id
+        join section_meetings sm on sm.section_id = se.id
         join courses c on c.id = se.course_id
         where sp.student_id = $1 and sp.term = $2
+        order by sp.section_id, sm.start_time
         """,
         student_id,
         term,
     )
     categories = await catalog.load_course_categories(pool, student_id)
-    courses = [_row_to_course_dict(dict(r), categories) for r in rows]
+    courses = _group_meetings_by_section([dict(r) for r in rows], categories)
     await cache.set_cached_schedule(student_id, term, courses)
     return {"term": term, "courses": courses}
 
@@ -364,33 +392,41 @@ async def get_full_plan(student: dict = Depends(get_current_student)) -> dict:
         """
         select sp.term, sp.section_id, sp.is_locked, sp.is_flagged, sp.flag_reason,
                c.id as course_id, c.code, c.title, c.credit_hours,
-               se.days, se.start_time, se.end_time
+               sm.days, sm.start_time, sm.end_time
         from semester_plans sp
         join sections se on se.id = sp.section_id
+        join section_meetings sm on sm.section_id = se.id
         join courses c on c.id = se.course_id
         where sp.student_id = $1
+        order by sp.term, sp.section_id, sm.start_time
         """,
         student_id,
     )
     categories = await catalog.load_course_categories(pool, student_id)
 
-    semesters: dict[str, dict] = {}
+    rows_by_term: dict[str, list[dict]] = {}
+    flags_by_term: dict[str, tuple[bool, str | None]] = {}
     for r in rows:
         term = r["term"]
-        semester = semesters.setdefault(
-            term, {"term": term, "is_flagged": False, "flag_reason": None, "courses": []}
-        )
+        rows_by_term.setdefault(term, []).append(dict(r))
         if r["is_flagged"]:
-            semester["is_flagged"] = True
-            semester["flag_reason"] = r["flag_reason"]
-        semester["courses"].append(_row_to_course_dict(dict(r), categories))
+            flags_by_term[term] = (True, r["flag_reason"])
 
-    for semester in semesters.values():
-        semester["total_credits"] = sum(c["credit_hours"] for c in semester["courses"])
+    semesters = []
+    for term, term_rows in rows_by_term.items():
+        courses = _group_meetings_by_section(term_rows, categories)
+        is_flagged, flag_reason = flags_by_term.get(term, (False, None))
+        semesters.append(
+            {
+                "term": term,
+                "is_flagged": is_flagged,
+                "flag_reason": flag_reason,
+                "courses": courses,
+                "total_credits": sum(c["credit_hours"] for c in courses),
+            }
+        )
 
-    ordered = sorted(
-        semesters.values(), key=lambda s: cascade.term_sort_key(s["term"])
-    )
+    ordered = sorted(semesters, key=lambda s: cascade.term_sort_key(s["term"]))
     return {"semesters": ordered}
 
 

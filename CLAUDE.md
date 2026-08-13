@@ -48,6 +48,51 @@ registrar. koala isn't competing with or replacing it — it demonstrates
 constraint-based multi-semester scheduling that Degree Works-style tools
 typically don't do.
 
+## Manual dataset import format
+
+Hand-compiled real data (course names, programs, requirements,
+prerequisites, section times) gets imported via `db/import_catalog.py`
+from one CSV per table, using human-readable natural keys instead of
+UUIDs. Two-phase import: resolve every natural-key reference first,
+collecting all failures rather than stopping at the first one; write
+nothing at all if any failures exist, otherwise write everything in one
+transaction. Unmatched references, duplicates, and self-references are
+all hard failures with row-level context in the error output — never a
+silent skip, null FK, or fuzzy/implicit match. Same principle as the
+Auth Admin API teardown hardening and the "Before User Created" hook
+being preferred over the raw-trigger pattern: silent data loss on a
+hand-typed catalog is worse than the script refusing to run.
+
+- `courses.csv`: `code, title, credit_hours, offering_frequency, department`
+- `programs.csv`: `name, type, department, required_by_program_name`
+- `degree_requirements.csv`: `program_name, course_code, category`
+- `prerequisites.csv`: `course_code, prerequisite_course_code`
+- `sections.csv`: `course_code, term, section_label, days, start_time, end_time, seats_total`
+  — **note the `section_label` column**, added after `sections`/
+  `section_meetings` were split (see "Real day/time overlap logic"
+  below). Multiple CSV rows sharing the same
+  `(course_code, term, section_label)` collapse into one `sections` row
+  plus one `section_meetings` row per CSV row — this is how a section
+  with a lecture-plus-lab split (two different day/time patterns) gets
+  represented as two CSV rows under the same section_label.
+
+## Prerequisite data (v1 simplification)
+
+Real prerequisite requirements live in ORU's course catalog PDF
+(hundreds of pages, distributed per catalog year, not individually
+browsable online) — verifying every prerequisite against the current
+catalog year wasn't practical to do reliably for v1. Instead,
+`prerequisites.csv` uses **sequence-informed inference**: prerequisite
+edges derived from a real degree plan sheet's recommended semester
+sequencing plus standard CS-curriculum structure (e.g. Data Structures
+reasonably follows Intermediate Programming), NOT verified against
+current course catalog text. This is the same honesty pattern as
+synthetic `sections` data — clearly labeled as an inference, not
+presented as ORU's authoritative requirement. Fine for demonstrating the
+solver's prerequisite-pruning and DFS cycle-detection logic, which is
+the actual point; would need real catalog verification before this
+could be presented as accurate to a real student.
+
 ## What this is
 
 A degree-audit and constraint-based schedule optimizer for Oral Roberts
@@ -486,21 +531,46 @@ though the blast-radius walk already knows which terms changed):
 
 1-hour TTL as a backstop against any missed invalidation path.
 
-## Real day/time overlap logic
+## Real day/time overlap logic (updated — section_meetings)
 
-Replaces the placeholder equality check in `scheduler_backtracking_sketch.py`.
-Two sections conflict only if their day-letters share a character AND
-their time ranges overlap:
+**This changed from the original single-meeting model.** Real Fall 2026
+registration data surfaced that a single section can have more than one
+distinct meeting pattern in the same term — e.g. CSC 255 Data
+Structures, section 01: MWF 8:40-9:35 AM AND separately Tuesday
+10:40-11:55 AM, both under one section (a lecture block plus a separate
+discussion block). The original `sections.days`/`start_time`/`end_time`
+columns could only hold one pattern — real risk of silently dropping a
+real meeting and missing a real conflict, which would undercut the
+actual thing this project demonstrates.
+
+**Fixed via `migration_003_section_meetings.sql`**: meeting times moved
+to a new one-to-many `section_meetings` table (`section_id`, `days`,
+`start_time`, `end_time`). A section with one meeting pattern (the
+common case) has one row; a section with a lecture-plus-lab split has
+two or more. See `schema.sql` for the current structure.
+
+**Conflict check must now compare across ALL meeting rows for both
+sections**, not a single day/time pair:
 
 ```python
-def has_time_conflict(a: Section, b: Section) -> bool:
-    shares_day = any(d in b.days for d in a.days)
-    overlaps_time = a.start_time < b.end_time and b.start_time < a.end_time
-    return shares_day and overlaps_time
+def has_time_conflict(section_a: Section, section_b: Section) -> bool:
+    for meeting_a in section_a.meetings:
+        for meeting_b in section_b.meetings:
+            shares_day = any(d in meeting_b.days for d in meeting_a.days)
+            overlaps_time = (
+                meeting_a.start_time < meeting_b.end_time
+                and meeting_b.start_time < meeting_a.end_time
+            )
+            if shares_day and overlaps_time:
+                return True
+    return False
 ```
 
-Uses the real `sections.days` (text, e.g. `"MWF"`) and
-`start_time`/`end_time` (Postgres `time`) columns already in the schema.
+This means `scheduler_backtracking_sketch.py`'s `Section` dataclass
+needs to change from a single `day_time: tuple[str, ...]` field to a
+`meetings: list[Meeting]` field (or equivalent), and `catalog.py`'s
+row-loading needs to join `section_meetings` and group by
+`section_id` when building solver input.
 
 ## Cost/tuition delta
 

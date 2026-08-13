@@ -6,6 +6,7 @@ from app.solver.scheduler_backtracking_sketch import (
     TIER_MINOR,
     Candidate,
     Course,
+    Meeting,
     Section,
     bottleneck_score,
     has_time_conflict,
@@ -15,10 +16,13 @@ from app.solver.scheduler_backtracking_sketch import (
 )
 
 
+def _time(hhmm: str) -> time:
+    h, m = map(int, hhmm.split(":"))
+    return time(h, m)
+
+
 def section(id_="S1", course_id="C1", days="MWF", start="9:00", end="9:50"):
-    h1, m1 = map(int, start.split(":"))
-    h2, m2 = map(int, end.split(":"))
-    return Section(id_, course_id, days, time(h1, m1), time(h2, m2))
+    return Section(id_, course_id, meetings=[Meeting(days, _time(start), _time(end))])
 
 
 # --- has_time_conflict ---
@@ -58,6 +62,51 @@ def test_back_to_back_times_do_not_conflict():
 def test_same_day_different_time_no_conflict():
     a = section(days="MWF", start="9:00", end="9:50")
     b = section(days="MWF", start="13:00", end="13:50")
+    assert not has_time_conflict(a, b)
+
+
+def test_multi_meeting_conflict_found_in_a_non_first_pair():
+    # A section can have more than one meeting pattern (lecture +
+    # discussion, say) — the conflict check must compare every meeting
+    # of one section against every meeting of the other, not just the
+    # first of each. Here the only overlapping pair is each section's
+    # SECOND meeting; the first meetings of both don't overlap at all.
+    a = Section(
+        "SA",
+        "A",
+        meetings=[
+            Meeting("MWF", _time("9:00"), _time("9:50")),
+            Meeting("T", _time("14:00"), _time("14:50")),
+        ],
+    )
+    b = Section(
+        "SB",
+        "B",
+        meetings=[
+            Meeting("R", _time("8:00"), _time("8:50")),
+            Meeting("T", _time("14:15"), _time("14:30")),  # overlaps a's second meeting
+        ],
+    )
+    assert has_time_conflict(a, b)
+
+
+def test_multi_meeting_no_conflict_when_no_pair_overlaps():
+    a = Section(
+        "SA",
+        "A",
+        meetings=[
+            Meeting("MWF", _time("9:00"), _time("9:50")),
+            Meeting("T", _time("14:00"), _time("14:50")),
+        ],
+    )
+    b = Section(
+        "SB",
+        "B",
+        meetings=[
+            Meeting("R", _time("8:00"), _time("8:50")),
+            Meeting("W", _time("16:00"), _time("16:50")),
+        ],
+    )
     assert not has_time_conflict(a, b)
 
 
@@ -257,7 +306,7 @@ def test_alternate_section_scheduled_when_first_conflicts_with_higher_priority()
     ids = {c.course.id for c in result}
     assert ids == {"A", "B"}
     chosen_b = next(c for c in result if c.course.id == "B")
-    assert chosen_b.section.days == "TR"  # the non-conflicting alternate, not the first section
+    assert chosen_b.section.meetings[0].days == "TR"  # the non-conflicting alternate
 
 
 def test_course_with_unsatisfied_prerequisite_is_excluded():

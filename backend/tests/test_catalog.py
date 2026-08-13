@@ -162,12 +162,20 @@ async def test_term_candidates_include_every_section_of_a_multi_section_course(d
     )
     candidates = await load_term_candidates(db_pool, remaining, "Fall 2026")
     art100_candidates = [c for c in candidates if c.course.id == ART100]
-    # ART100 has two Fall 2026 sections (MWF 13:00 and TR 13:00) — both
-    # must come back as separate candidates, not collapsed to one, so
-    # the solver actually gets to choose between them (see CLAUDE.md's
-    # "Multiple sections per course").
+    # ART100 has two Fall 2026 sections — both must come back as
+    # separate candidates, not collapsed to one, so the solver actually
+    # gets to choose between them (see CLAUDE.md's "Multiple sections
+    # per course"). One of them (the one that conflicts with HIST101)
+    # is itself split into two section_meetings rows — proving
+    # load_term_candidates groups multi-row meetings under one Section
+    # correctly, not just that sections aren't collapsed.
     assert len(art100_candidates) == 2
-    assert {c.section.days for c in art100_candidates} == {"MWF", "TR"}
+    meeting_counts = sorted(len(c.section.meetings) for c in art100_candidates)
+    assert meeting_counts == [1, 2]
+    single_meeting = next(c for c in art100_candidates if len(c.section.meetings) == 1)
+    multi_meeting = next(c for c in art100_candidates if len(c.section.meetings) == 2)
+    assert single_meeting.section.meetings[0].days == "TR"
+    assert {m.days for m in multi_meeting.section.meetings} == {"MW", "F"}
 
 
 @pytest.mark.asyncio

@@ -76,3 +76,12 @@ create policy "catalog writable by service role" on sections
     for all
     using (auth.role() = 'service_role')
     with check (auth.role() = 'service_role');
+
+alter table section_meetings enable row level security;
+create policy "catalog readable by authenticated" on section_meetings
+    for select
+    using (auth.role() = 'authenticated');
+create policy "catalog writable by service role" on section_meetings
+    for all
+    using (auth.role() = 'service_role')
+    with check (auth.role() = 'service_role');

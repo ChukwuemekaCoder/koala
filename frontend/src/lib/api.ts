@@ -52,6 +52,12 @@ export async function getStudentProfile(accessToken: string): Promise<StudentPro
   return apiFetch<StudentProfile>("/students/me", accessToken);
 }
 
+export interface SectionMeeting {
+  days: string;
+  start_time: string;
+  end_time: string;
+}
+
 export interface ScheduleCourse {
   course_id: string;
   code: string;
@@ -59,9 +65,7 @@ export interface ScheduleCourse {
   credit_hours: number;
   category: "major" | "minor" | "gen_ed";
   section_id: string;
-  days: string;
-  start_time: string;
-  end_time: string;
+  meetings: SectionMeeting[];
   is_locked: boolean;
   is_flagged: boolean;
   flag_reason: string | null;

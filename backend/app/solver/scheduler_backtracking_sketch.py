@@ -50,12 +50,22 @@ class Course:
 
 
 @dataclass
-class Section:
-    id: str
-    course_id: str
+class Meeting:
     days: str        # e.g. "MWF" — any combination of M/T/W/R/F/S/U
     start_time: time
     end_time: time
+
+
+@dataclass
+class Section:
+    id: str
+    course_id: str
+    # A section can have more than one distinct meeting pattern in the
+    # same term (e.g. an MWF lecture plus a separate Tuesday discussion
+    # block) — see CLAUDE.md's "Real day/time overlap logic (updated —
+    # section_meetings)" for the real registration data that surfaced
+    # this. Never assume exactly one meeting per section.
+    meetings: list[Meeting] = field(default_factory=list)
 
 
 @dataclass
@@ -97,15 +107,21 @@ def priority_key(candidate: Candidate) -> tuple:
 
 def has_time_conflict(section_a: Section, section_b: Section) -> bool:
     """
-    Two sections conflict only if their day-letters share a character
-    AND their time ranges overlap.
+    Two sections conflict if ANY meeting pattern of one shares a day
+    AND overlaps in time with ANY meeting pattern of the other — a
+    section with a lecture-plus-discussion split must be checked
+    pairwise across every meeting, not just its first one.
     """
-    shares_day = any(d in section_b.days for d in section_a.days)
-    overlaps_time = (
-        section_a.start_time < section_b.end_time
-        and section_b.start_time < section_a.end_time
-    )
-    return shares_day and overlaps_time
+    for meeting_a in section_a.meetings:
+        for meeting_b in section_b.meetings:
+            shares_day = any(d in meeting_b.days for d in meeting_a.days)
+            overlaps_time = (
+                meeting_a.start_time < meeting_b.end_time
+                and meeting_b.start_time < meeting_a.end_time
+            )
+            if shares_day and overlaps_time:
+                return True
+    return False
 
 
 def prerequisites_satisfied(
@@ -235,12 +251,15 @@ if __name__ == "__main__":
     )
     econ = Course("ECON201", 3, "every_semester", unlocks_count=0)
 
+    def _section(id_, course_id, days, start, end):
+        return Section(id_, course_id, meetings=[Meeting(days, start, end)])
+
     candidates = [
-        Candidate(calc_2, Section("S1", "CALC2", "MWF", time(9, 0), time(9, 50)), tier=TIER_MAJOR),
-        Candidate(fitness, Section("S2", "FIT101", "TR", time(11, 0), time(11, 50)), tier=TIER_GENED),
-        Candidate(theology, Section("S3", "THEO201", "MWF", time(9, 0), time(9, 50)), tier=TIER_GENED),
-        Candidate(data_structures, Section("S4", "CS210", "TR", time(9, 30), time(10, 45)), tier=TIER_MAJOR),
-        Candidate(econ, Section("S5", "ECON201", "MWF", time(13, 0), time(13, 50)), tier=TIER_MINOR),
+        Candidate(calc_2, _section("S1", "CALC2", "MWF", time(9, 0), time(9, 50)), tier=TIER_MAJOR),
+        Candidate(fitness, _section("S2", "FIT101", "TR", time(11, 0), time(11, 50)), tier=TIER_GENED),
+        Candidate(theology, _section("S3", "THEO201", "MWF", time(9, 0), time(9, 50)), tier=TIER_GENED),
+        Candidate(data_structures, _section("S4", "CS210", "TR", time(9, 30), time(10, 45)), tier=TIER_MAJOR),
+        Candidate(econ, _section("S5", "ECON201", "MWF", time(13, 0), time(13, 50)), tier=TIER_MINOR),
     ]
 
     schedule = solve_semester(candidates, completed_course_ids={"CALC1"})

@@ -73,20 +73,32 @@ create table degree_requirements (
     unique (program_id, course_id, category)
 );
 
--- A specific offering of a course in a specific term, with an actual
--- time slot. day_time kept simple (text) for v1 — revisit if the
--- conflict-check logic needs structured start/end times.
+-- A specific offering of a course in a specific term. Meeting times
+-- live in section_meetings (one-to-many) — a section can meet with
+-- genuinely different day/time patterns in the same term (e.g. a
+-- lecture block MWF plus a separate discussion/lab block on a
+-- different day), which a single days/start_time/end_time column
+-- can't represent. See migration_003_section_meetings.sql for the
+-- real example that surfaced this.
 create table sections (
     id uuid primary key default gen_random_uuid(),
     course_id uuid not null references courses(id) on delete cascade,
     term text not null,                     -- e.g. 'Fall 2027'
-    days text not null,                     -- e.g. 'MWF'
-    start_time time not null,
-    end_time time not null,
     seats_total int not null check (seats_total > 0),
     seats_taken int not null default 0 check (seats_taken >= 0),
-    constraint valid_time_range check (end_time > start_time),
     constraint seats_within_capacity check (seats_taken <= seats_total)
+);
+
+-- One row per distinct meeting pattern for a section. A section with
+-- one meeting time (the common case) has exactly one row here; a
+-- section with a lecture-plus-lab split has two or more.
+create table section_meetings (
+    id uuid primary key default gen_random_uuid(),
+    section_id uuid not null references sections(id) on delete cascade,
+    days text not null,                     -- e.g. 'MWF', 'T'
+    start_time time not null,
+    end_time time not null,
+    constraint valid_time_range check (end_time > start_time)
 );
 
 -- Per-student, per-course status. Confirmed once, satisfies every
@@ -121,3 +133,4 @@ create index idx_student_progress_student on student_progress(student_id);
 create index idx_semester_plans_student_term on semester_plans(student_id, term);
 create index idx_prerequisites_course on prerequisites(course_id);
 create index idx_sections_course_term on sections(course_id, term);
+create index idx_section_meetings_section on section_meetings(section_id);
