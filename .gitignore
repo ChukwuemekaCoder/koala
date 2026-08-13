@@ -15,11 +15,19 @@ dist/
 # IDE-installed agent skill docs, not part of the project (unclear origin)
 frontend/.agents/
 
-# Original spec drop (canonical copies now live at repo root / db/ / backend/)
-files.zip
-files/
-update_files.zip
-update_files/
+# Chat-attachment auto-extraction artifacts — land in a top-level
+# folder/zip whose name varies per batch ("files", "files 2", "filez",
+# "update_files", ...), never part of the project. Canonical copies
+# live at repo root / db/ / backend/ per file type — if genuinely new
+# content ever shows up only here, move it to its proper location
+# before it's lost, don't rely on it staying in one of these folders.
+/files/
+/files*/
+/files*.zip
+/filez/
+/filez*.zip
+/update_files/
+/update_files*.zip
 
 # Unexplained browser-save artifact, not project content
 migration_001_nullable_onboarding_fields.sql.html
