@@ -15,6 +15,7 @@ import { MetricCards } from "./MetricCards";
 import { SemesterOutlookRow } from "./SemesterOutlookRow";
 import { SemesterCalendarGrid } from "./SemesterCalendarGrid";
 import { CourseOverrideModal } from "./CourseOverrideModal";
+import { AddCourseModal } from "./AddCourseModal";
 
 interface DashboardProps {
   accessToken: string;
@@ -29,6 +30,8 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overrideCourse, setOverrideCourse] = useState<ScheduleCourse | null>(null);
+  const [addCourseOpen, setAddCourseOpen] = useState(false);
+  const [showSwapHint, setShowSwapHint] = useState(false);
 
   const refreshPlan = useCallback(async () => {
     const [plan, proj] = await Promise.all([
@@ -130,11 +133,38 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
               semesters={semesters}
               currentTerm={currentTerm ?? ""}
               expandedTerm={expandedTerm}
-              onSelect={setExpandedTerm}
+              onSelect={(term) => {
+                setExpandedTerm(term);
+                setShowSwapHint(false);
+              }}
             />
 
             {expandedSemester && (
               <div className="card">
+                <div className="semester-detail-header">
+                  <p className="semester-detail-heading">{expandedSemester.term}</p>
+                  <div className="semester-detail-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary btn-small"
+                      onClick={() => setAddCourseOpen(true)}
+                    >
+                      Add a course
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-small"
+                      onClick={() => setShowSwapHint((v) => !v)}
+                    >
+                      Swap a course
+                    </button>
+                  </div>
+                </div>
+                {showSwapHint && (
+                  <p className="semester-detail-hint">
+                    Click any course below to swap or remove it.
+                  </p>
+                )}
                 <SemesterCalendarGrid
                   semester={expandedSemester}
                   onCourseClick={setOverrideCourse}
@@ -154,6 +184,19 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
           onClose={() => setOverrideCourse(null)}
           onSaved={() => {
             setOverrideCourse(null);
+            refreshPlan();
+          }}
+        />
+      )}
+
+      {addCourseOpen && expandedSemester && (
+        <AddCourseModal
+          accessToken={accessToken}
+          term={expandedSemester.term}
+          semesterTotalCredits={expandedSemester.total_credits}
+          onClose={() => setAddCourseOpen(false)}
+          onSaved={() => {
+            setAddCourseOpen(false);
             refreshPlan();
           }}
         />

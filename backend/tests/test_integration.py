@@ -322,6 +322,45 @@ async def test_optimize_get_and_override_end_to_end(test_user):
                 for month in ("May", "December")
             )
 
+            # Add-a-course modal's data source: the full 3-semester plan
+            # already covers every remaining CS+Math course, so nothing
+            # should be addable to any term right now — proves
+            # load_addable_candidates' "excludes anything scheduled
+            # anywhere" logic against real data, not just an empty pool.
+            addable_res = await api.get(
+                "/schedule/me/addable", params={"term": first_term}, headers=headers
+            )
+            assert addable_res.status_code == 200
+            assert addable_res.json()["courses"] == []
+
+            # Attempting to add CS210's already-scheduled section into a
+            # DIFFERENT term than where it's actually scheduled must be
+            # blocked — otherwise the same requirement would be
+            # double-booked across two semesters.
+            cs210_term = next(
+                semester["term"]
+                for semester in full_plan["semesters"]
+                if any(c["course_id"] == CS210_ID for c in semester["courses"])
+            )
+            cs210_section_id = next(
+                c["section_id"]
+                for semester in full_plan["semesters"]
+                for c in semester["courses"]
+                if c["course_id"] == CS210_ID
+            )
+            other_term = next(
+                semester["term"]
+                for semester in full_plan["semesters"]
+                if semester["term"] != cs210_term
+            )
+            double_book_res = await api.post(
+                "/schedule/override",
+                json={"term": other_term, "add_section_id": cs210_section_id},
+                headers=headers,
+            )
+            assert double_book_res.status_code == 422
+            assert "already scheduled" in double_book_res.json()["detail"].lower()
+
             # Override modal's data source: list this course's sections
             # for the term before deciding to remove/swap it.
             course_to_remove = first_semester["courses"][0]["course_id"]

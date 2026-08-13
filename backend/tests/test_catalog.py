@@ -17,6 +17,7 @@ from app.solver.catalog import (
     _check_for_cycles,
     _remaining_requirements_for_declared_programs,
     categories_from_remaining,
+    load_addable_candidates,
     load_locked_candidates,
     load_term_candidates,
 )
@@ -27,6 +28,11 @@ from app.solver.scheduler_backtracking_sketch import TIER_GENED, TIER_MAJOR, TIE
 # student_progress 'done' row actually exists to prove the difference —
 # a fake student_id here has no progress rows either way, so testing
 # it against this file's pattern wouldn't distinguish the two modes.
+# Same reasoning for load_addable_candidates' "excludes courses already
+# scheduled in another term" behavior — that needs a real semester_plans
+# row (FK-linked to a real student), so it's also proven end-to-end in
+# test_integration.py; only the trivial no-declared-programs case is
+# testable here.
 
 CS = "aaaaaaaa-0000-0000-0000-000000000001"
 MATH = "aaaaaaaa-0000-0000-0000-000000000002"
@@ -219,3 +225,13 @@ async def test_load_locked_candidates_empty_when_no_semester_plans(db_pool):
     )
     locked = await load_locked_candidates(db_pool, remaining, FAKE_STUDENT_ID, "Fall 2026")
     assert locked == []
+
+
+@pytest.mark.asyncio
+async def test_addable_candidates_empty_when_no_declared_programs(db_pool):
+    # FAKE_STUDENT_ID has no student_programs row — nothing declared,
+    # so nothing addable, same "empty, not an error" shape the endpoint
+    # exposes. The "excludes already-scheduled-elsewhere" behavior needs
+    # a real semester_plans row and is proven in test_integration.py.
+    candidates = await load_addable_candidates(db_pool, FAKE_STUDENT_ID, "Fall 2026")
+    assert candidates == []

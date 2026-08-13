@@ -1008,7 +1008,42 @@ input {
   color: var(--koala-ink);
 }
 
-/* Expanded semester detail: weekly calendar grid */
+/* Expanded semester detail: header (Add/Swap a course) + weekly grid */
+.semester-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 0;
+}
+
+.semester-detail-heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--koala-ink);
+  margin: 0;
+}
+
+.semester-detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.semester-detail-hint {
+  font-size: 13px;
+  color: var(--koala-attention-text);
+  background: var(--koala-attention-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 16px 24px 0;
+}
+
 .calendar-grid-wrap {
   padding: 24px;
 }
@@ -1444,6 +1479,11 @@ input {
 .section-option-list {
   display: flex;
   flex-direction: column;
+}
+
+.add-course-list {
+  max-height: 360px;
+  overflow-y: auto;
 }
 
 .section-option {

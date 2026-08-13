@@ -110,6 +110,36 @@ async def load_all_required_courses(
     )
 
 
+async def load_addable_candidates(
+    pool: asyncpg.Pool, student_id: str, term: str
+) -> list[Candidate]:
+    """
+    Every (course, section) combination the student could genuinely add
+    to `term` via POST /schedule/override's add-only path: still
+    required, and not already scheduled in semester_plans for ANY term
+    — adding a second section of an already-scheduled course would
+    double-book that requirement across two semesters. Powers the "Add
+    a course" modal.
+    """
+    remaining = await load_remaining_requirements(pool, student_id)
+    if not remaining:
+        return []
+
+    scheduled_rows = await pool.fetch(
+        """
+        select se.course_id from semester_plans sp
+        join sections se on se.id = sp.section_id
+        where sp.student_id = $1
+        """,
+        student_id,
+    )
+    already_scheduled = frozenset(str(r["course_id"]) for r in scheduled_rows)
+
+    return await load_term_candidates(
+        pool, remaining, term, exclude_course_ids=already_scheduled
+    )
+
+
 async def _remaining_requirements_for_declared_programs(
     pool: asyncpg.Pool,
     student_id: str,

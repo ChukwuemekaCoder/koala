@@ -206,11 +206,30 @@ async def override(
         if add_row is None:
             raise HTTPException(404, "That section doesn't exist")
 
+        add_course_id = str(add_row["course_id"])
         remaining = await catalog.load_remaining_requirements(pool, student_id)
-        if str(add_row["course_id"]) not in remaining:
+        if add_course_id not in remaining:
             raise HTTPException(
                 422, "That course doesn't count toward any of your remaining requirements"
             )
+
+        # A swap (remove_course_id + add_section_id for the same course,
+        # same term) is fine — this only blocks adding a course that's
+        # already committed to a DIFFERENT semester, which would
+        # otherwise double-book one requirement across two terms.
+        existing_elsewhere = await pool.fetchrow(
+            """
+            select 1 from semester_plans sp
+            join sections se on se.id = sp.section_id
+            where sp.student_id = $1 and se.course_id = $2 and sp.term != $3
+            """,
+            student_id,
+            add_course_id,
+            body.term,
+        )
+        if existing_elsewhere is not None:
+            raise HTTPException(422, "That course is already scheduled in another semester")
+
         added_credits = add_row["credit_hours"]
 
     prospective_total = current_total - removed_credits + added_credits
@@ -420,6 +439,34 @@ async def get_full_plan(student: dict = Depends(get_current_student)) -> dict:
 
     ordered = sorted(semesters, key=lambda s: cascade.term_sort_key(s["term"]))
     return {"semesters": ordered}
+
+
+@router.get("/me/addable")
+async def get_addable_courses(
+    term: str | None = None, student: dict = Depends(get_current_student)
+) -> dict:
+    """
+    Every course+section the student could add to `term` via
+    POST /schedule/override's add-only path — powers the "Add a
+    course" modal. Same shape as every other course listing (reuses
+    ScheduleCourse on the frontend); is_locked/is_flagged are always
+    false since these aren't part of the plan yet. No declared-programs
+    guard — an empty list is a valid, expected response here, not an
+    error state.
+    """
+    if not term:
+        raise HTTPException(400, "term is required")
+
+    student_id = str(student["id"])
+    pool = get_pool()
+    categories = await catalog.load_course_categories(pool, student_id)
+    candidates = await catalog.load_addable_candidates(pool, student_id, term)
+    return {
+        "courses": [
+            _serialize_candidate(c, category=categories.get(c.course.id, "major"))
+            for c in candidates
+        ]
+    }
 
 
 @router.get("/me/projection")

@@ -89,6 +89,21 @@ async def test_get_full_plan_empty_when_no_plan_exists(client):
 
 
 @pytest.mark.asyncio
+async def test_get_addable_400_when_term_missing(client):
+    res = await client.get("/schedule/me/addable")
+    assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_addable_empty_when_no_declared_programs(client):
+    # Unlike course-history, no declared programs is a valid "nothing
+    # addable" state here, not an error — 200 with an empty list.
+    res = await client.get("/schedule/me/addable", params={"term": "Fall 2026"})
+    assert res.status_code == 200
+    assert res.json() == {"courses": []}
+
+
+@pytest.mark.asyncio
 async def test_get_projection_zeros_when_nothing_declared_or_planned(client):
     res = await client.get("/schedule/me/projection")
     assert res.status_code == 200

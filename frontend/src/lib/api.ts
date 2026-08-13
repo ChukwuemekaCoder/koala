@@ -114,6 +114,13 @@ export async function overrideSchedule(
   });
 }
 
+export async function getAddableCourses(
+  accessToken: string,
+  term: string,
+): Promise<{ courses: ScheduleCourse[] }> {
+  return apiFetch(`/schedule/me/addable?term=${encodeURIComponent(term)}`, accessToken);
+}
+
 export interface Program {
   id: string;
   name: string;

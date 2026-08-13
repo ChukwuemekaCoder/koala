@@ -6,14 +6,9 @@ import {
   type CourseSection,
   type ScheduleCourse,
 } from "../../lib/api";
+import { formatMeetings } from "../../lib/format";
 
 const MIN_CREDITS = 12;
-
-function formatMeetings(meetings: CourseSection["meetings"]): string {
-  return meetings
-    .map((m) => `${m.days} ${m.start_time.slice(0, 5)}–${m.end_time.slice(0, 5)}`)
-    .join(", ");
-}
 
 interface CourseOverrideModalProps {
   accessToken: string;
