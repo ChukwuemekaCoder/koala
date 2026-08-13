@@ -27,7 +27,12 @@ function blockColorClass(course: ScheduleCourse): string {
   return "calendar-block--other";
 }
 
-export function SemesterCalendarGrid({ semester }: { semester: Semester }) {
+interface SemesterCalendarGridProps {
+  semester: Semester;
+  onCourseClick?: (course: ScheduleCourse) => void;
+}
+
+export function SemesterCalendarGrid({ semester, onCourseClick }: SemesterCalendarGridProps) {
   if (semester.courses.length === 0) {
     return (
       <div className="calendar-grid-wrap">
@@ -64,7 +69,8 @@ export function SemesterCalendarGrid({ semester }: { semester: Semester }) {
                     const top = ((startMin - GRID_START_MIN) / GRID_RANGE_MIN) * 100;
                     const height = ((endMin - startMin) / GRID_RANGE_MIN) * 100;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={`${course.course_id}-${meetingIndex}-${day}`}
                         className={`calendar-block ${blockColorClass(course)}`}
                         style={{
@@ -72,10 +78,11 @@ export function SemesterCalendarGrid({ semester }: { semester: Semester }) {
                           height: `${Math.max(height, 4)}%`,
                         }}
                         title={`${course.title} — ${meeting.start_time.slice(0, 5)}–${meeting.end_time.slice(0, 5)}`}
+                        onClick={() => onCourseClick?.(course)}
                       >
                         {course.is_locked && <IconLock size={12} stroke={2} />}
                         <span>{course.code}</span>
-                      </div>
+                      </button>
                     );
                   }),
               )}

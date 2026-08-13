@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import cache
 from app.config import settings
 from app.db import close_pool, get_pool, init_pool
+from app.routers.catalog import router as catalog_router
 from app.routers.schedule import router as schedule_router
 from app.routers.students import router as students_router
 
@@ -30,6 +31,7 @@ app.add_middleware(
 
 app.include_router(schedule_router)
 app.include_router(students_router)
+app.include_router(catalog_router)
 
 
 @app.get("/health")

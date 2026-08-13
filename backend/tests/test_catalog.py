@@ -22,6 +22,12 @@ from app.solver.catalog import (
 )
 from app.solver.scheduler_backtracking_sketch import TIER_GENED, TIER_MAJOR, TIER_MINOR
 
+# load_all_required_courses (the exclude_completed=False public entry
+# point) is exercised end-to-end in test_integration.py, where a real
+# student_progress 'done' row actually exists to prove the difference —
+# a fake student_id here has no progress rows either way, so testing
+# it against this file's pattern wouldn't distinguish the two modes.
+
 CS = "aaaaaaaa-0000-0000-0000-000000000001"
 MATH = "aaaaaaaa-0000-0000-0000-000000000002"
 ART = "aaaaaaaa-0000-0000-0000-000000000003"
@@ -49,6 +55,21 @@ async def test_cs_only_pulls_cs_requirements_not_other_programs(db_pool):
     assert ids == {CS110, CS210, CS310, MATH121, THEO101, ENGL101, HIST101}
     assert MATH120 not in ids  # only required by the Math minor, not declared
     assert ART100 not in ids
+
+
+@pytest.mark.asyncio
+async def test_exclude_completed_false_still_returns_full_pool(db_pool):
+    # Nothing is marked done/in_progress for this fake student, so with
+    # nothing to exclude either way, exclude_completed=False should
+    # return exactly the same course set as the default — proves the
+    # parameter wires through without accidentally dropping anything.
+    default = await _remaining_requirements_for_declared_programs(
+        db_pool, FAKE_STUDENT_ID, [CS]
+    )
+    all_required = await _remaining_requirements_for_declared_programs(
+        db_pool, FAKE_STUDENT_ID, [CS], exclude_completed=False
+    )
+    assert set(all_required.keys()) == set(default.keys())
 
 
 @pytest.mark.asyncio

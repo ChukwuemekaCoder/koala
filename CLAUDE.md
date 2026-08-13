@@ -67,14 +67,29 @@ hand-typed catalog is worse than the script refusing to run.
 - `programs.csv`: `name, type, department, required_by_program_name`
 - `degree_requirements.csv`: `program_name, course_code, category`
 - `prerequisites.csv`: `course_code, prerequisite_course_code`
-- `sections.csv`: `course_code, term, section_label, days, start_time, end_time, seats_total`
+- `sections.csv`: `course_code, term, section_label, days, start_time, end_time`
   — **note the `section_label` column**, added after `sections`/
   `section_meetings` were split (see "Real day/time overlap logic"
   below). Multiple CSV rows sharing the same
   `(course_code, term, section_label)` collapse into one `sections` row
   plus one `section_meetings` row per CSV row — this is how a section
   with a lecture-plus-lab split (two different day/time patterns) gets
-  represented as two CSV rows under the same section_label.
+  represented as two CSV rows under the same section_label. No seats
+  column — see below.
+
+## No seat capacity tracking
+
+`sections` intentionally has no `seats_total`/`seats_taken` — removed via
+`migration_004_remove_seat_tracking.sql`. koala has no live connection to
+ORU's registration system (same principle as the login-wall boundary on
+section time sourcing), so seat counts could only ever be a stale,
+manually-entered snapshot displayed as if it were current. Rather than
+show a number that looks live but isn't, don't show one at all. This
+also means the solver has never used seat capacity as a constraint —
+only time conflicts, prerequisites, tier priority, and credit bounds —
+so this removal doesn't affect any solver logic, only schema and any UI
+that was displaying seat counts (e.g. the override modal's section list
+shows just the meeting time, not seat availability).
 
 ## Prerequisite data (v1 simplification)
 

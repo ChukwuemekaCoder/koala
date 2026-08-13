@@ -91,8 +91,30 @@ async def load_remaining_requirements(
     )
 
 
+async def load_all_required_courses(
+    pool: asyncpg.Pool, student_id: str
+) -> dict[str, RequiredCourse]:
+    """
+    Same as load_remaining_requirements, but WITHOUT excluding courses
+    already 'done'/'in_progress' — every course required by the
+    student's declared programs, regardless of status. Powers
+    GET /students/me/course-history (onboarding step 3 needs to show
+    and let the student re-confirm status on courses they've already
+    marked, not just what's left).
+    """
+    declared_ids = await load_declared_program_ids(pool, student_id)
+    if not declared_ids:
+        return {}
+    return await _remaining_requirements_for_declared_programs(
+        pool, student_id, declared_ids, exclude_completed=False
+    )
+
+
 async def _remaining_requirements_for_declared_programs(
-    pool: asyncpg.Pool, student_id: str, declared_ids: list[str]
+    pool: asyncpg.Pool,
+    student_id: str,
+    declared_ids: list[str],
+    exclude_completed: bool = True,
 ) -> dict[str, RequiredCourse]:
     """
     Split out from load_remaining_requirements() so it's testable against
@@ -116,6 +138,9 @@ async def _remaining_requirements_for_declared_programs(
 
     declared_set = set(declared_ids)
 
+    # $3 lets Postgres itself short-circuit the exclusion subquery rather
+    # than building the query string dynamically — keeps the parameter
+    # count fixed regardless of exclude_completed.
     req_rows = await pool.fetch(
         """
         select dr.course_id, dr.program_id, dr.category,
@@ -123,13 +148,14 @@ async def _remaining_requirements_for_declared_programs(
         from degree_requirements dr
         join courses c on c.id = dr.course_id
         where dr.program_id = any($1::uuid[])
-          and c.id not in (
+          and ($3 = false or c.id not in (
             select course_id from student_progress
             where student_id = $2 and status in ('done', 'in_progress')
-          )
+          ))
         """,
         list(declared_set),
         student_id,
+        exclude_completed,
     )
 
     remaining: dict[str, RequiredCourse] = {}

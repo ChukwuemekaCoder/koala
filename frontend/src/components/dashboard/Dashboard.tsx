@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getFullPlan,
   getProjection,
   getStudentProfile,
   optimizeSchedule,
   type Projection,
+  type ScheduleCourse,
   type Semester,
   type StudentProfile,
 } from "../../lib/api";
@@ -13,6 +14,7 @@ import { AppHeader } from "./AppHeader";
 import { MetricCards } from "./MetricCards";
 import { SemesterOutlookRow } from "./SemesterOutlookRow";
 import { SemesterCalendarGrid } from "./SemesterCalendarGrid";
+import { CourseOverrideModal } from "./CourseOverrideModal";
 
 interface DashboardProps {
   accessToken: string;
@@ -26,6 +28,16 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
   const [expandedTerm, setExpandedTerm] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [overrideCourse, setOverrideCourse] = useState<ScheduleCourse | null>(null);
+
+  const refreshPlan = useCallback(async () => {
+    const [plan, proj] = await Promise.all([
+      getFullPlan(accessToken),
+      getProjection(accessToken),
+    ]);
+    setSemesters(plan.semesters);
+    setProjection(proj);
+  }, [accessToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,12 +135,29 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
 
             {expandedSemester && (
               <div className="card">
-                <SemesterCalendarGrid semester={expandedSemester} />
+                <SemesterCalendarGrid
+                  semester={expandedSemester}
+                  onCourseClick={setOverrideCourse}
+                />
               </div>
             )}
           </>
         )}
       </div>
+
+      {overrideCourse && expandedSemester && (
+        <CourseOverrideModal
+          accessToken={accessToken}
+          term={expandedSemester.term}
+          course={overrideCourse}
+          semesterTotalCredits={expandedSemester.total_credits}
+          onClose={() => setOverrideCourse(null)}
+          onSaved={() => {
+            setOverrideCourse(null);
+            refreshPlan();
+          }}
+        />
+      )}
     </div>
   );
 }

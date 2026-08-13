@@ -180,6 +180,39 @@ async def test_optimize_get_and_override_end_to_end(test_user):
             declared_ids = {p["program_id"] for p in declare_res.json()["programs"]}
             assert declared_ids == {CS_PROGRAM_ID, MATH_PROGRAM_ID}
 
+            # Onboarding step 2: confirm class standing + current term
+            # through the real endpoint — there was previously no way
+            # to set these at all.
+            standing_res = await api.patch(
+                "/students/me",
+                json={"class_standing": "freshman", "current_term": "fall"},
+                headers=headers,
+            )
+            assert standing_res.status_code == 200
+            assert standing_res.json()["class_standing"] == "freshman"
+            assert standing_res.json()["current_term"] == "fall"
+
+            # Catalog reads: generic, not student-specific, but confirm
+            # they actually return the real seeded catalog through the
+            # real endpoints.
+            programs_res = await api.get("/programs", headers=headers)
+            assert programs_res.status_code == 200
+            assert any(
+                p["id"] == CS_PROGRAM_ID for p in programs_res.json()["programs"]
+            )
+            courses_res = await api.get("/courses", headers=headers)
+            assert courses_res.status_code == 200
+            assert any(c["id"] == CS110_ID for c in courses_res.json()["courses"])
+
+            # Course history before any progress is confirmed: every
+            # course required by the declared CS+Math pool, all
+            # defaulting to not_taken since nothing's been confirmed yet.
+            history_before = await api.get("/students/me/course-history", headers=headers)
+            assert history_before.status_code == 200
+            history_by_id = {c["course_id"]: c for c in history_before.json()["courses"]}
+            assert CS110_ID in history_by_id
+            assert history_by_id[CS110_ID]["status"] == "not_taken"
+
             # Onboarding step 3: bulk-confirm course history. CS110 marked
             # done should be excluded from the generated plan entirely;
             # THEO101 as not_taken exercises a second entry in the same
@@ -197,6 +230,20 @@ async def test_optimize_get_and_override_end_to_end(test_user):
             assert progress_res.status_code == 200
             progress_course_ids = {p["course_id"] for p in progress_res.json()["progress"]}
             assert progress_course_ids == {CS110_ID, THEO101_ID}
+
+            # Course history after confirming: load_all_required_courses
+            # (unlike load_remaining_requirements) must still include
+            # CS110 even though it's now 'done' — this is the real proof
+            # exclude_completed=False actually differs from the default,
+            # which a fake-student unit test can't demonstrate (no real
+            # student_progress row to exclude in the first place).
+            history_after = await api.get("/students/me/course-history", headers=headers)
+            assert history_after.status_code == 200
+            history_by_id_after = {
+                c["course_id"]: c for c in history_after.json()["courses"]
+            }
+            assert history_by_id_after[CS110_ID]["status"] == "done"
+            assert history_by_id_after[THEO101_ID]["status"] == "not_taken"
 
             # Bulk progress confirmation completing is what marks
             # onboarding done (CLAUDE.md: set on step 3, not step 1).
@@ -275,8 +322,18 @@ async def test_optimize_get_and_override_end_to_end(test_user):
                 for month in ("May", "December")
             )
 
-            # Override: remove one course from the first semester.
+            # Override modal's data source: list this course's sections
+            # for the term before deciding to remove/swap it.
             course_to_remove = first_semester["courses"][0]["course_id"]
+            sections_res = await api.get(
+                f"/courses/{course_to_remove}/sections",
+                params={"term": first_term},
+                headers=headers,
+            )
+            assert sections_res.status_code == 200
+            assert len(sections_res.json()["sections"]) >= 1
+
+            # Override: remove one course from the first semester.
             override_res = await api.post(
                 "/schedule/override",
                 json={"term": first_term, "remove_course_id": course_to_remove},

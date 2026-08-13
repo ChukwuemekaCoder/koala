@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app import cache
 from app.auth import get_current_student
 from app.db import get_pool
+from app.serialization import group_meetings_by_section
 from app.solver import cascade, catalog
 from app.solver.scheduler_backtracking_sketch import MAX_CREDITS, MIN_CREDITS, Candidate
 
@@ -306,39 +307,30 @@ async def override(
 def _group_meetings_by_section(rows: list[dict], categories: dict[str, str]) -> list[dict]:
     """
     Groups flat (one-row-per-meeting) SQL rows into one course dict per
-    section, folding each row's single meeting into a `meetings` list —
-    mirrors catalog.py's section-grouping, needed because
-    section_meetings is one-to-many off sections (see CLAUDE.md's
-    "Real day/time overlap logic (updated — section_meetings)").
-    Preserves row order, so callers should ORDER BY section_id then a
-    meeting-level column.
+    section, using serialization.group_meetings_by_section for the
+    meetings themselves and the first row per section_id for everything
+    else. Preserves row order, so callers should ORDER BY section_id
+    then a meeting-level column.
     """
+    meetings_by_section = group_meetings_by_section(rows)
     sections: dict[str, dict] = {}
     for r in rows:
         section_id = str(r["section_id"])
-        course = sections.get(section_id)
-        if course is None:
-            course_id = str(r["course_id"])
-            course = {
-                "course_id": course_id,
-                "code": r["code"],
-                "title": r["title"],
-                "credit_hours": r["credit_hours"],
-                "category": categories.get(course_id, "major"),
-                "section_id": section_id,
-                "meetings": [],
-                "is_locked": r["is_locked"],
-                "is_flagged": r["is_flagged"],
-                "flag_reason": r["flag_reason"],
-            }
-            sections[section_id] = course
-        course["meetings"].append(
-            {
-                "days": r["days"],
-                "start_time": r["start_time"].isoformat(),
-                "end_time": r["end_time"].isoformat(),
-            }
-        )
+        if section_id in sections:
+            continue
+        course_id = str(r["course_id"])
+        sections[section_id] = {
+            "course_id": course_id,
+            "code": r["code"],
+            "title": r["title"],
+            "credit_hours": r["credit_hours"],
+            "category": categories.get(course_id, "major"),
+            "section_id": section_id,
+            "meetings": meetings_by_section[section_id],
+            "is_locked": r["is_locked"],
+            "is_flagged": r["is_flagged"],
+            "flag_reason": r["flag_reason"],
+        }
     return list(sections.values())
 
 

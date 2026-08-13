@@ -120,3 +120,29 @@ async def test_patch_progress_rejects_invalid_status_value(client):
         json={"status": "not-a-real-status"},
     )
     assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_me_rejects_invalid_class_standing(client):
+    res = await client.patch("/students/me", json={"class_standing": "not-a-real-year"})
+    assert res.status_code == 422  # Pydantic's Literal catches this before any query
+
+
+@pytest.mark.asyncio
+async def test_patch_me_rejects_invalid_current_term(client):
+    res = await client.patch("/students/me", json={"current_term": "summer"})
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_me_with_no_fields_is_a_no_op(client):
+    res = await client.patch("/students/me", json={})
+    assert res.status_code == 200
+    assert res.json()["id"] == str(FAKE_STUDENT["id"])
+
+
+@pytest.mark.asyncio
+async def test_course_history_422_when_no_declared_programs(client):
+    res = await client.get("/students/me/course-history")
+    assert res.status_code == 422
+    assert "declare" in res.json()["detail"].lower()

@@ -11,7 +11,7 @@ from app.routers.schedule import (
     _persist_cascade_result,
     _serialize_cascade,
 )
-from app.solver import cascade
+from app.solver import cascade, catalog
 
 router = APIRouter(prefix="/students/me", tags=["students"])
 
@@ -64,6 +64,37 @@ async def create_me(
 @router.get("")
 async def get_me(student: dict = Depends(get_current_student)) -> dict:
     return _serialize_student(student)
+
+
+ClassStanding = Literal["freshman", "sophomore", "junior", "senior"]
+CurrentTerm = Literal["fall", "spring"]
+
+
+class UpdateStudentRequest(BaseModel):
+    class_standing: ClassStanding | None = None
+    current_term: CurrentTerm | None = None
+
+
+@router.patch("")
+async def update_me(
+    body: UpdateStudentRequest, student: dict = Depends(get_current_student)
+) -> dict:
+    """Onboarding step 2. Both fields are optional per-call (either can
+    be set independently), but the onboarding UI submits both together.
+    Only touches the fields actually provided — omitting one leaves it
+    unchanged rather than nulling it out."""
+    student_id = str(student["id"])
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        return _serialize_student(student)
+
+    set_clauses = [f"{field} = ${i + 2}" for i, field in enumerate(updates)]
+    row = await get_pool().fetchrow(
+        f"update students set {', '.join(set_clauses)} where id = $1 returning *",
+        student_id,
+        *updates.values(),
+    )
+    return _serialize_student(dict(row))
 
 
 class ProgramDeclaration(BaseModel):
@@ -280,3 +311,46 @@ async def correct_progress(
     await cache.invalidate_schedule_cache(student_id)
 
     return _serialize_cascade(result)
+
+
+@router.get("/course-history")
+async def get_course_history(student: dict = Depends(get_current_student)) -> dict:
+    """
+    Onboarding step 3: every course required by the student's declared
+    programs (whatever their current status), each annotated with the
+    same category label the dashboard's calendar grid uses and the
+    student's current status (defaulting to 'not_taken' when they
+    haven't confirmed it yet). One call gives the frontend everything
+    the course-history list + category filter + Done/In-progress tags
+    need — declared programs must exist first (422s otherwise, same
+    gate as POST /schedule/optimize).
+    """
+    student_id = str(student["id"])
+    pool = get_pool()
+
+    required = await catalog.load_all_required_courses(pool, student_id)
+    if not required:
+        raise HTTPException(
+            422, "Declare at least one major or minor before confirming course history"
+        )
+    categories = catalog.categories_from_remaining(required)
+
+    progress_rows = await pool.fetch(
+        "select course_id, status from student_progress where student_id = $1",
+        student_id,
+    )
+    status_by_course = {str(r["course_id"]): r["status"] for r in progress_rows}
+
+    courses = [
+        {
+            "course_id": course_id,
+            "code": rc.course.code,
+            "title": rc.course.title,
+            "credit_hours": rc.course.credit_hours,
+            "category": categories.get(course_id, "major"),
+            "status": status_by_course.get(course_id, "not_taken"),
+        }
+        for course_id, rc in required.items()
+    ]
+    courses.sort(key=lambda c: c["code"])
+    return {"courses": courses}

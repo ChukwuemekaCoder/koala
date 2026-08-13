@@ -103,3 +103,88 @@ export async function optimizeSchedule(
 export async function getProjection(accessToken: string): Promise<Projection> {
   return apiFetch("/schedule/me/projection", accessToken);
 }
+
+export async function overrideSchedule(
+  accessToken: string,
+  body: { term: string; add_section_id?: string; remove_course_id?: string },
+): Promise<{ graduated: boolean; semesters: Semester[] }> {
+  return apiFetch("/schedule/override", accessToken, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  type: "major" | "minor";
+  department: string | null;
+  required_by_program_id: string | null;
+}
+
+export async function getPrograms(accessToken: string): Promise<{ programs: Program[] }> {
+  return apiFetch("/programs", accessToken);
+}
+
+export async function declarePrograms(
+  accessToken: string,
+  programIds: string[],
+): Promise<void> {
+  await apiFetch("/students/me/programs", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ programs: programIds.map((program_id) => ({ program_id })) }),
+  });
+}
+
+export async function updateStandingTerm(
+  accessToken: string,
+  body: { class_standing?: string; current_term?: string },
+): Promise<StudentProfile> {
+  return apiFetch("/students/me", accessToken, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export type ProgressStatus = "done" | "in_progress" | "not_taken";
+
+export interface CourseHistoryEntry {
+  course_id: string;
+  code: string;
+  title: string;
+  credit_hours: number;
+  category: "major" | "minor" | "gen_ed";
+  status: ProgressStatus;
+}
+
+export async function getCourseHistory(
+  accessToken: string,
+): Promise<{ courses: CourseHistoryEntry[] }> {
+  return apiFetch("/students/me/course-history", accessToken);
+}
+
+export async function confirmProgress(
+  accessToken: string,
+  progress: { course_id: string; status: ProgressStatus }[],
+): Promise<void> {
+  await apiFetch("/students/me/progress", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ progress }),
+  });
+}
+
+export interface CourseSection {
+  section_id: string;
+  meetings: SectionMeeting[];
+}
+
+export async function getSections(
+  accessToken: string,
+  courseId: string,
+  term: string,
+): Promise<{ sections: CourseSection[] }> {
+  return apiFetch(
+    `/courses/${courseId}/sections?term=${encodeURIComponent(term)}`,
+    accessToken,
+  );
+}

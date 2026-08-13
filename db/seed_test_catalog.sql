@@ -107,60 +107,50 @@ insert into degree_requirements (program_id, course_id, category) values
 -- deliberately clash (MWF 9:00-9:50) in the fall term. Fixed UUIDs
 -- (cccc- prefix, matching aaaa-/bbbb- for programs/courses) so
 -- section_meetings rows below can reference them directly.
-insert into sections (id, course_id, term, seats_total) values
+insert into sections (id, course_id, term) values
     ('cccccccc-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000001',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     ('cccccccc-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000006',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     ('cccccccc-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000004',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     ('cccccccc-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000007',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     ('cccccccc-0000-0000-0000-000000000005', 'bbbbbbbb-0000-0000-0000-000000000009',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     ('cccccccc-0000-0000-0000-000000000006', 'bbbbbbbb-0000-0000-0000-000000000008',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     -- ART100's second current-term section — the one that conflicts
     -- with HIST101, and the one split into two meetings below.
     ('cccccccc-0000-0000-0000-000000000007', 'bbbbbbbb-0000-0000-0000-000000000009',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || extract(year from now())::int
-          else 'Fall ' || extract(year from now())::int end,
-     30),
+          else 'Fall ' || extract(year from now())::int end),
     -- next term (fall -> spring of next year, or spring -> fall same year)
     ('cccccccc-0000-0000-0000-000000000008', 'bbbbbbbb-0000-0000-0000-000000000002',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
-          else 'Spring ' || (extract(year from now())::int + 1) end,
-     30),
+          else 'Spring ' || (extract(year from now())::int + 1) end),
     ('cccccccc-0000-0000-0000-000000000009', 'bbbbbbbb-0000-0000-0000-000000000005',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
-          else 'Spring ' || (extract(year from now())::int + 1) end,
-     30),
+          else 'Spring ' || (extract(year from now())::int + 1) end),
     ('cccccccc-0000-0000-0000-000000000010', 'bbbbbbbb-0000-0000-0000-000000000010',
      case when extract(month from now()) between 1 and 7
           then 'Fall ' || extract(year from now())::int
-          else 'Spring ' || (extract(year from now())::int + 1) end,
-     30),
+          else 'Spring ' || (extract(year from now())::int + 1) end),
     -- term after next: CS310 needs CS210 (seeded in the "next term"
     -- bucket above), so it can't be schedulable any earlier than a
     -- third term without violating its own prerequisite. Without this
@@ -170,8 +160,7 @@ insert into sections (id, course_id, term, seats_total) values
     ('cccccccc-0000-0000-0000-000000000011', 'bbbbbbbb-0000-0000-0000-000000000003',
      case when extract(month from now()) between 1 and 7
           then 'Spring ' || (extract(year from now())::int + 1)
-          else 'Fall ' || (extract(year from now())::int + 1) end,
-     30);
+          else 'Fall ' || (extract(year from now())::int + 1) end);
 
 -- Meeting patterns. One row per section, except section 0007 (ART100's
 -- conflicting section), which gets two — a lecture-style MW block plus

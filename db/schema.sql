@@ -80,13 +80,14 @@ create table degree_requirements (
 -- different day), which a single days/start_time/end_time column
 -- can't represent. See migration_003_section_meetings.sql for the
 -- real example that surfaced this.
+--
+-- No seat capacity tracking — koala has no live connection to ORU's
+-- registration system, so seat counts could only ever be stale/manual
+-- numbers presented as if live. See migration_004_remove_seat_tracking.sql.
 create table sections (
     id uuid primary key default gen_random_uuid(),
     course_id uuid not null references courses(id) on delete cascade,
-    term text not null,                     -- e.g. 'Fall 2027'
-    seats_total int not null check (seats_total > 0),
-    seats_taken int not null default 0 check (seats_taken >= 0),
-    constraint seats_within_capacity check (seats_taken <= seats_total)
+    term text not null                      -- e.g. 'Fall 2027'
 );
 
 -- One row per distinct meeting pattern for a section. A section with
