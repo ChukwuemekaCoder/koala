@@ -12,6 +12,11 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +49,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # This job runs directly on the runner, not inside a container,
+          # so the "redis" service hostname (used by docker-compose.yml's
+          # own containers) doesn't resolve here — service containers are
+          # only reachable by name from other containers on the same job.
+          # From the bare runner they're published to localhost instead.
+          REDIS_URL: redis://localhost:6379/0
 
   build-image:
     needs: lint-and-test
