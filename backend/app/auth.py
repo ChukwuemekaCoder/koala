@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import lru_cache
 
 import jwt
 from fastapi import Depends, HTTPException, Security, status
@@ -9,7 +10,19 @@ from app.config import settings
 from app.db import get_pool
 
 _bearer_scheme = HTTPBearer(auto_error=True)
-_jwk_client = PyJWKClient(f"{settings.supabase_url}/auth/v1/.well-known/jwks.json")
+
+
+@lru_cache(maxsize=1)
+def _get_jwk_client() -> PyJWKClient:
+    # Built lazily (first real auth check) rather than at import time —
+    # constructing this eagerly at module load makes SUPABASE_URL a hard
+    # requirement just to *import* app.auth, which broke pytest collection
+    # for every test file that imports it (directly or via app.main),
+    # even pure-logic tests with no auth/DB dependency at all, whenever
+    # SUPABASE_URL was unset (e.g. CI without the Supabase secrets wired
+    # up yet). Deferring construction until a request actually needs
+    # token verification keeps collection working regardless.
+    return PyJWKClient(f"{settings.supabase_url}/auth/v1/.well-known/jwks.json")
 
 # PyJWT validates iat/nbf/exp with zero leeway by default, which is too
 # strict for verifying a token issued by a separate remote service (our
@@ -36,7 +49,7 @@ async def get_current_auth_user(
     """
     token = credentials.credentials
     try:
-        signing_key = _jwk_client.get_signing_key_from_jwt(token)
+        signing_key = _get_jwk_client().get_signing_key_from_jwt(token)
         payload = jwt.decode(
             token,
             signing_key.key,

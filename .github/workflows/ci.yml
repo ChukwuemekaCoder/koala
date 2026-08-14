@@ -29,16 +29,20 @@ jobs:
 
       # DB-backed tests (test_catalog.py, test_schedule_endpoints.py,
       # test_integration.py) need a real DATABASE_URL/SUPABASE_URL/
-      # SUPABASE_SERVICE_ROLE_KEY pointing at a Supabase project with
-      # db/seed_test_catalog.sql applied. Add these as repo secrets to
-      # enable them in CI — not done here, since that means exposing
-      # live DB credentials to CI runs and deserves an explicit decision
-      # rather than being wired up silently. Until then this step fails.
+      # SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY pointing at a
+      # Supabase project with db/seed_test_catalog.sql applied. These
+      # are repo secrets (Settings > Secrets and variables > Actions),
+      # same 4 names/values as backend/.env locally — see
+      # .env.example for where each one comes from in the Supabase
+      # dashboard. Explicit decision made to point CI at the same
+      # dev/demo project already used for manual testing, consistent
+      # with this project running on synthetic/mock data throughout.
       - name: Run tests
         run: pytest -v
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   build-image:
