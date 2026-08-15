@@ -62,6 +62,16 @@ the second clause without needing a smaller font size.
 
 ## Component patterns
 
+- **Set text color explicitly on interactive elements** (options,
+  labels, list items) rather than relying purely on inherited color from
+  an ancestor container. This bit us directly in the override modal
+  design — meeting-time text was unreadable because it was relying on
+  inheritance through several nested containers instead of a direct
+  color declaration. Any component nested inside a card, modal, or
+  section wrapper should declare its own text color rather than assume
+  it's correctly inherited.
+
+
 - **Card** (`.pw-card` equivalent): white background, 12–14px radius,
   `box-shadow: 0 4px 16px rgba(32,43,46,0.06)`. No border needed when
   shadow is present against a sage/white background.
@@ -125,6 +135,21 @@ the second clause without needing a smaller font size.
 ## Motion spec
 
 Restrained and purposeful — nothing decorative:
+
+- **Route transitions** (added after routing was introduced): outgoing
+  page fades out over 150ms, incoming page fades in over 200ms with a
+  slight 8px upward rise. No slide/wipe/zoom effects — consistent with
+  the restraint already established below. This exists specifically to
+  avoid the jarring instant-swap feel of unanimated route changes.
+- **Loading skeleton**: any screen that fetches data on load (dashboard
+  especially) shows a shimmering skeleton matching the real layout's
+  shape — header, timeline, metric cards, outlook row, calendar grid —
+  not a blank screen and NOT an error message during normal loading.
+  Shimmer is a moving gradient sweep (~1.6s loop), not a static gray
+  block, so it reads as active rather than stalled. The error state
+  ("Couldn't load your schedule") must only ever fire on an actual
+  failed request, never during normal loading — these are two distinct
+  states in the code and must not be conflated.
 
 - **Scroll reveals**: feature/testimonial cards fade + rise 12px over
   ~300ms as they enter viewport, staggered ~60ms per card in a row.
@@ -206,15 +231,23 @@ Built and locked during design (see chat history for full mockups):
 
 ## Known gaps — not yet designed
 
-- **Credit-hour bound blocked state**: the UI for what happens when a
-  student tries to drop below 12 or exceed 18 credits (see `CLAUDE.md`
-  re-solve cascade section — this is a hard block, not a soft flag, and
-  needs a clear inline message, not just a rejected action).
-- **Course override modal**: triggered by clicking a calendar grid block
-  or the "Swap a course" link — not yet mocked.
-- **Onboarding flow screens**: program selection, class standing/term
-  confirmation, and the course history done/in-progress/not-taken
-  tagging UI (see `CLAUDE.md` onboarding flow) — not yet mocked visually,
-  though the flow/logic is fully specified.
 - **Tutorial overlay**: dismissible walkthrough for new users — not
   mocked.
+
+## Designed (see chat history for interactive prototypes)
+
+Onboarding (all 3 steps), the override modal (swap/remove, with the
+min-credit blocked state), and the add-a-course modal (with the
+max-credit blocked state) are all fully designed and interactively
+prototyped — not sketches, tested widgets with working search/filter/
+toggle behavior. Implementation status (built vs. not-yet-built) is
+tracked via commits/prompts to Claude Code, not here — this file
+tracks design completeness only.
+
+**Note on the "Swap a course" link**: it's a contextual hint, not a
+standalone trigger — it can't independently know which course to open
+the override modal for, since the modal is inherently course-specific.
+The actual entry point for swapping/removing a course is clicking that
+course's calendar block directly; the header link just points at that
+behavior. This resolves an ambiguity in the original dashboard mockup
+rather than being a missing feature.

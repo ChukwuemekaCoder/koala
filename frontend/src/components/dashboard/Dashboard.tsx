@@ -16,6 +16,7 @@ import { SemesterOutlookRow } from "./SemesterOutlookRow";
 import { SemesterCalendarGrid } from "./SemesterCalendarGrid";
 import { CourseOverrideModal } from "./CourseOverrideModal";
 import { AddCourseModal } from "./AddCourseModal";
+import { DashboardSkeleton } from "./DashboardSkeleton";
 
 interface DashboardProps {
   accessToken: string;
@@ -82,7 +83,7 @@ export function Dashboard({ accessToken, onSignOut, onNotificationsClick }: Dash
   }, [accessToken]);
 
   if (loading) {
-    return <div className="dashboard-page" />;
+    return <DashboardSkeleton />;
   }
 
   if (error || !profile || !projection) {
