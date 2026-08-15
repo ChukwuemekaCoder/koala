@@ -175,6 +175,14 @@ async def declare_programs(
     return {"programs": await _fetch_declared_programs(student_id)}
 
 
+@router.get("/programs")
+async def get_declared_programs(student: dict = Depends(get_current_student)) -> dict:
+    """Currently declared majors/minors — onboarding step 1's re-hydration
+    source when a student navigates Back to it after already declaring.
+    Empty list is a valid response (nothing declared yet), not an error."""
+    return {"programs": await _fetch_declared_programs(str(student["id"]))}
+
+
 ProgressStatus = Literal["done", "in_progress", "not_taken"]
 
 

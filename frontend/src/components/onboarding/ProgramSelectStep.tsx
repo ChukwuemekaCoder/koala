@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconInfoCircle, IconX } from "@tabler/icons-react";
-import { declarePrograms, getPrograms, type Program } from "../../lib/api";
+import {
+  declarePrograms,
+  getDeclaredPrograms,
+  getPrograms,
+  type Program,
+} from "../../lib/api";
 import { OnboardingStepHeader } from "./OnboardingStepHeader";
 
 interface ProgramSelectStepProps {
@@ -17,8 +22,32 @@ export function ProgramSelectStep({ accessToken, onContinue }: ProgramSelectStep
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getPrograms(accessToken)
-      .then((res) => setPrograms(res.programs))
+    Promise.all([getPrograms(accessToken), getDeclaredPrograms(accessToken)])
+      .then(([catalogRes, declaredRes]) => {
+        setPrograms(catalogRes.programs);
+
+        // Re-hydration for Back navigation: split what's already declared
+        // into explicit picks vs. auto-required minors, so the auto ones
+        // still render as the outlined chip variant instead of a normal
+        // removable one — same distinction the search-select flow itself
+        // maintains, just derived from saved state instead of a fresh pick.
+        const declaredIds = new Set(declaredRes.programs.map((p) => p.program_id));
+        const declaredMajorIds = new Set(
+          catalogRes.programs
+            .filter((p) => p.type === "major" && declaredIds.has(p.id))
+            .map((p) => p.id),
+        );
+        const explicitIds = new Set(
+          [...declaredIds].filter((id) => {
+            const program = catalogRes.programs.find((p) => p.id === id);
+            return !(
+              program?.required_by_program_id &&
+              declaredMajorIds.has(program.required_by_program_id)
+            );
+          }),
+        );
+        setSelectedIds(explicitIds);
+      })
       .catch(() => setError("Couldn't load the program list — try refreshing."))
       .finally(() => setLoading(false));
   }, [accessToken]);

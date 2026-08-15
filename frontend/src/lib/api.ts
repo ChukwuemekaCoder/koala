@@ -143,6 +143,19 @@ export async function declarePrograms(
   });
 }
 
+export interface DeclaredProgram {
+  program_id: string;
+  name: string;
+  type: "major" | "minor";
+  priority_rank: number | null;
+}
+
+export async function getDeclaredPrograms(
+  accessToken: string,
+): Promise<{ programs: DeclaredProgram[] }> {
+  return apiFetch("/students/me/programs", accessToken);
+}
+
 export async function updateStandingTerm(
   accessToken: string,
   body: { class_standing?: string; current_term?: string },

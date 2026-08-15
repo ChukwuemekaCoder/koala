@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { updateStandingTerm } from "../../lib/api";
+import { useEffect, useState } from "react";
+import { getStudentProfile, updateStandingTerm } from "../../lib/api";
 import { OnboardingStepHeader } from "./OnboardingStepHeader";
 
 interface StandingTermStepProps {
@@ -23,8 +23,19 @@ const TERMS = [
 export function StandingTermStep({ accessToken, onContinue, onBack }: StandingTermStepProps) {
   const [classStanding, setClassStanding] = useState<string | null>(null);
   const [currentTerm, setCurrentTerm] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getStudentProfile(accessToken)
+      .then((profile) => {
+        setClassStanding(profile.class_standing);
+        setCurrentTerm(profile.current_term);
+      })
+      .catch(() => setError("Couldn't load your previous selection — try refreshing."))
+      .finally(() => setLoading(false));
+  }, [accessToken]);
 
   async function handleContinue() {
     if (!classStanding || !currentTerm) return;
@@ -63,6 +74,7 @@ export function StandingTermStep({ accessToken, onContinue, onBack }: StandingTe
               }`}
               onClick={() => setClassStanding(option.value)}
               aria-pressed={classStanding === option.value}
+              disabled={loading}
             >
               {option.label}
             </button>
@@ -82,6 +94,7 @@ export function StandingTermStep({ accessToken, onContinue, onBack }: StandingTe
               }`}
               onClick={() => setCurrentTerm(option.value)}
               aria-pressed={currentTerm === option.value}
+              disabled={loading}
             >
               {option.label}
             </button>
@@ -96,7 +109,7 @@ export function StandingTermStep({ accessToken, onContinue, onBack }: StandingTe
           type="button"
           className="btn-primary"
           onClick={handleContinue}
-          disabled={!classStanding || !currentTerm || saving}
+          disabled={!classStanding || !currentTerm || saving || loading}
         >
           {saving ? "Saving…" : "Continue"}
         </button>

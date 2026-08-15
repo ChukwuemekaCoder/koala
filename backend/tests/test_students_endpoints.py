@@ -63,6 +63,15 @@ async def test_declare_programs_empty_list_is_allowed(client):
 
 
 @pytest.mark.asyncio
+async def test_get_declared_programs_empty_when_none_declared(client):
+    # Read-only, so safe against FAKE_STUDENT's nonexistent id — nothing
+    # declared is a valid response, not an error, same as the POST case.
+    res = await client.get("/students/me/programs")
+    assert res.status_code == 200
+    assert res.json() == {"programs": []}
+
+
+@pytest.mark.asyncio
 async def test_declare_programs_rejects_non_positive_priority_rank(client):
     res = await client.post(
         "/students/me/programs",

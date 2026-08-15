@@ -180,6 +180,15 @@ async def test_optimize_get_and_override_end_to_end(test_user):
             declared_ids = {p["program_id"] for p in declare_res.json()["programs"]}
             assert declared_ids == {CS_PROGRAM_ID, MATH_PROGRAM_ID}
 
+            # Onboarding Back re-hydration source: a fresh GET (not just
+            # the POST's own echoed response) must reflect what was just
+            # declared — this is what ProgramSelectStep re-fetches when a
+            # student navigates Back to step 1.
+            get_declared_res = await api.get("/students/me/programs", headers=headers)
+            assert get_declared_res.status_code == 200
+            get_declared_ids = {p["program_id"] for p in get_declared_res.json()["programs"]}
+            assert get_declared_ids == {CS_PROGRAM_ID, MATH_PROGRAM_ID}
+
             # Onboarding step 2: confirm class standing + current term
             # through the real endpoint — there was previously no way
             # to set these at all.
