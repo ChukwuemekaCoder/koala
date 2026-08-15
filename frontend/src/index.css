@@ -1235,6 +1235,11 @@ input {
   margin-bottom: 12px;
 }
 
+.chip-explanation {
+  margin-top: -4px;
+  margin-bottom: 16px;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1340,8 +1345,6 @@ input {
   font-size: 12px;
   font-weight: 500;
   color: var(--koala-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   margin: 20px 0 8px;
 }
 

@@ -117,12 +117,19 @@ export function ProgramSelectStep({ accessToken, onContinue }: ProgramSelectStep
               </span>
             ))}
           {autoRequired.map((p) => (
-            <span className="chip chip--outlined" key={p.id} title="Required by your major">
+            <span className="chip chip--outlined" key={p.id}>
               <IconInfoCircle size={14} stroke={2} className="chip-info-icon" />
               <span className="chip-label chip-label--outlined">{p.name}</span>
             </span>
           ))}
         </div>
+      )}
+
+      {autoRequired.length > 0 && (
+        <p className="onboarding-subtext chip-explanation">
+          Outlined chips are required by your major — added automatically, not
+          removable here.
+        </p>
       )}
 
       <div className="search-field">

@@ -35,6 +35,8 @@ no maximalism. When in doubt, remove an element rather than add one.
 | `--koala-success-text` | `#0F6E56` | Text on success fill |
 | `--koala-attention-bg` | `#FAECE7` | Light attention/flag fill |
 | `--koala-attention-text` | `#993C1D` | Text on attention fill |
+| `--koala-other-bg` | `#ECE9F7` | The calendar grid's third block color — the "purple tint reserved for a third category" described below |
+| `--koala-other-text` | `#5B4E96` | Text on `--koala-other-bg` |
 
 **Rule: only ONE dark/saturated section per page at a time.** The landing
 page's closing "join koala" band is the single deliberate dark-teal
