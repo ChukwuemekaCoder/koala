@@ -250,6 +250,19 @@ async def test_optimize_get_and_override_end_to_end(test_user):
             me_res = await api.get("/students/me", headers=headers)
             assert me_res.status_code == 200
             assert me_res.json()["onboarding_complete"] is True
+            assert me_res.json()["has_completed_tutorial"] is False
+
+            # Tutorial overlay dismissal (Skip or completing all 4 slides)
+            # persists via this PATCH — never client-side storage
+            # (CLAUDE.md) — so it must survive a fresh GET, not just
+            # reflect back in the PATCH response itself.
+            tutorial_res = await api.patch(
+                "/students/me", json={"has_completed_tutorial": True}, headers=headers
+            )
+            assert tutorial_res.status_code == 200
+            assert tutorial_res.json()["has_completed_tutorial"] is True
+            me_res_after_tutorial = await api.get("/students/me", headers=headers)
+            assert me_res_after_tutorial.json()["has_completed_tutorial"] is True
 
             # Optimize's 422 gate is "has declared programs" — the thing
             # this whole endpoint suite was blocked on until now, since

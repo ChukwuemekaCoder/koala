@@ -17,6 +17,7 @@ import { SemesterCalendarGrid } from "./SemesterCalendarGrid";
 import { CourseOverrideModal } from "./CourseOverrideModal";
 import { AddCourseModal } from "./AddCourseModal";
 import { DashboardSkeleton } from "./DashboardSkeleton";
+import { TutorialOverlay } from "./TutorialOverlay";
 
 interface DashboardProps {
   accessToken: string;
@@ -34,6 +35,7 @@ export function Dashboard({ accessToken, onSignOut, onNotificationsClick }: Dash
   const [overrideCourse, setOverrideCourse] = useState<ScheduleCourse | null>(null);
   const [addCourseOpen, setAddCourseOpen] = useState(false);
   const [showSwapHint, setShowSwapHint] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const refreshPlan = useCallback(async () => {
     const [plan, proj] = await Promise.all([
@@ -67,6 +69,7 @@ export function Dashboard({ accessToken, onSignOut, onNotificationsClick }: Dash
         setSemesters(planSemesters);
         setProjection(proj);
         setExpandedTerm(planSemesters[0]?.term ?? null);
+        setShowTutorial(!studentProfile.has_completed_tutorial);
       } catch {
         if (!cancelled) {
           setError("Couldn't load your schedule — try refreshing the page.");
@@ -202,6 +205,13 @@ export function Dashboard({ accessToken, onSignOut, onNotificationsClick }: Dash
             setAddCourseOpen(false);
             refreshPlan();
           }}
+        />
+      )}
+
+      {showTutorial && (
+        <TutorialOverlay
+          accessToken={accessToken}
+          onDismiss={() => setShowTutorial(false)}
         />
       )}
     </div>

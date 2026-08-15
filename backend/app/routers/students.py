@@ -73,6 +73,7 @@ CurrentTerm = Literal["fall", "spring"]
 class UpdateStudentRequest(BaseModel):
     class_standing: ClassStanding | None = None
     current_term: CurrentTerm | None = None
+    has_completed_tutorial: bool | None = None
 
 
 @router.patch("")

@@ -1701,3 +1701,61 @@ input {
     transform: none;
   }
 }
+
+/* --- Tutorial overlay --- */
+
+.tutorial-modal {
+  text-align: center;
+}
+
+.tutorial-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--koala-primary-tint);
+  color: var(--koala-primary);
+}
+
+.tutorial-headline {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--koala-ink);
+  margin: 0 0 10px;
+}
+
+.tutorial-body {
+  font-size: 14px;
+  color: var(--koala-muted);
+  margin: 0 0 24px;
+}
+
+.tutorial-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tutorial-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--koala-border);
+  transition: background-color 150ms ease, width 150ms ease, height 150ms ease;
+}
+
+.tutorial-dot--completed {
+  background: var(--koala-primary);
+}
+
+.tutorial-dot--current {
+  width: 8px;
+  height: 8px;
+  background: var(--koala-primary);
+}

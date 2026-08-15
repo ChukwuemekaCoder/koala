@@ -153,6 +153,13 @@ export async function updateStandingTerm(
   });
 }
 
+export async function completeTutorial(accessToken: string): Promise<StudentProfile> {
+  return apiFetch("/students/me", accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ has_completed_tutorial: true }),
+  });
+}
+
 export type ProgressStatus = "done" | "in_progress" | "not_taken";
 
 export interface CourseHistoryEntry {
