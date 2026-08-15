@@ -1135,7 +1135,67 @@ input {
   font-size: 12px;
   font-weight: 500;
   color: var(--koala-muted);
-  margin: 0 0 8px;
+  margin: 0;
+}
+
+.onboarding-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.onboarding-step-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.onboarding-progress-row .onboarding-step-progress {
+  margin-bottom: 0;
+}
+
+.onboarding-step-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.onboarding-step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--koala-surface);
+  border: 1.5px solid var(--koala-border);
+}
+
+.onboarding-step-dot--completed {
+  background: var(--koala-primary);
+  border-color: var(--koala-primary);
+}
+
+.onboarding-step-dot--current {
+  width: 9px;
+  height: 9px;
+  background: var(--koala-surface);
+  border: 2px solid var(--koala-gold);
+}
+
+.onboarding-back {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--koala-muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.onboarding-back:hover {
+  color: var(--koala-ink);
 }
 
 .onboarding-heading {

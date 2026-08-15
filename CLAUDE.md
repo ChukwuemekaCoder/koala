@@ -186,6 +186,20 @@ present mock reviews as real).
    `students.has_completed_tutorial`, not client-side storage.
 5. Engine generates the first recommended schedule.
 
+**Known limitation — Back doesn't re-hydrate previous selections**: each
+step's "Back" link (DESIGN.md's onboarding step indicator spec) correctly
+navigates to the prior step, but that step's local UI state isn't
+pre-filled from what was already saved — step 1's majors/minors chips and
+step 2's class-standing/term selection both render empty on re-entry, even
+though `declarePrograms`/`updateStandingTerm` already persisted the real
+values server-side. Nothing is lost (a student who continues forward again
+without re-selecting anything will still have their original choices,
+since the earlier writes already went through), but the UI doesn't reflect
+that on a Back visit, which could read as if the selection was cleared.
+The actual fix — each step's mount effect pre-filling from `GET
+/students/me` + the already-declared programs/progress — is a separate
+follow-up, not yet built.
+
 ### 4. Main workpage
 Primary interaction is NOT manual course picking — the engine recommends a
 full schedule; the student can override individual choices. Manual-only

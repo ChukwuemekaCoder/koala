@@ -39,12 +39,17 @@ export function Onboarding({ accessToken, onComplete }: OnboardingProps) {
               <ProgramSelectStep accessToken={accessToken} onContinue={() => setStep(2)} />
             )}
             {step === 2 && (
-              <StandingTermStep accessToken={accessToken} onContinue={() => setStep(3)} />
+              <StandingTermStep
+                accessToken={accessToken}
+                onContinue={() => setStep(3)}
+                onBack={() => setStep(1)}
+              />
             )}
             {step === 3 && (
               <CourseHistoryStep
                 accessToken={accessToken}
                 onComplete={handleCourseHistoryDone}
+                onBack={() => setStep(2)}
               />
             )}
           </>

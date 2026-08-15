@@ -5,10 +5,12 @@ import {
   type CourseHistoryEntry,
   type ProgressStatus,
 } from "../../lib/api";
+import { OnboardingStepHeader } from "./OnboardingStepHeader";
 
 interface CourseHistoryStepProps {
   accessToken: string;
   onComplete: () => void;
+  onBack: () => void;
 }
 
 const CATEGORY_FILTERS: { value: "all" | CourseHistoryEntry["category"]; label: string }[] = [
@@ -24,7 +26,7 @@ const CATEGORY_HEADINGS: Record<CourseHistoryEntry["category"], string> = {
   gen_ed: "Gen-ed",
 };
 
-export function CourseHistoryStep({ accessToken, onComplete }: CourseHistoryStepProps) {
+export function CourseHistoryStep({ accessToken, onComplete, onBack }: CourseHistoryStepProps) {
   const [courses, setCourses] = useState<CourseHistoryEntry[]>([]);
   const [statuses, setStatuses] = useState<Record<string, ProgressStatus>>({});
   const [categoryFilter, setCategoryFilter] =
@@ -92,7 +94,7 @@ export function CourseHistoryStep({ accessToken, onComplete }: CourseHistoryStep
 
   return (
     <div>
-      <p className="onboarding-step-label">Step 3 of 3</p>
+      <OnboardingStepHeader step={3} onBack={onBack} />
       <h1 className="onboarding-heading">Your course history</h1>
       <p className="onboarding-subtext">
         Tag anything you've already done or are currently taking. Everything else

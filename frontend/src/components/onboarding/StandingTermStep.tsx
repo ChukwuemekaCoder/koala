@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { updateStandingTerm } from "../../lib/api";
+import { OnboardingStepHeader } from "./OnboardingStepHeader";
 
 interface StandingTermStepProps {
   accessToken: string;
   onContinue: () => void;
+  onBack: () => void;
 }
 
 const CLASS_STANDINGS = [
@@ -18,7 +20,7 @@ const TERMS = [
   { value: "spring", label: "Spring" },
 ];
 
-export function StandingTermStep({ accessToken, onContinue }: StandingTermStepProps) {
+export function StandingTermStep({ accessToken, onContinue, onBack }: StandingTermStepProps) {
   const [classStanding, setClassStanding] = useState<string | null>(null);
   const [currentTerm, setCurrentTerm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -43,7 +45,7 @@ export function StandingTermStep({ accessToken, onContinue }: StandingTermStepPr
 
   return (
     <div>
-      <p className="onboarding-step-label">Step 2 of 3</p>
+      <OnboardingStepHeader step={2} onBack={onBack} />
       <h1 className="onboarding-heading">Where you're at</h1>
       <p className="onboarding-subtext">
         This tells the engine where to start building your schedule from.

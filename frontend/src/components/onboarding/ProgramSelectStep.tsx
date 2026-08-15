@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconInfoCircle, IconX } from "@tabler/icons-react";
 import { declarePrograms, getPrograms, type Program } from "../../lib/api";
+import { OnboardingStepHeader } from "./OnboardingStepHeader";
 
 interface ProgramSelectStepProps {
   accessToken: string;
@@ -92,7 +93,7 @@ export function ProgramSelectStep({ accessToken, onContinue }: ProgramSelectStep
 
   return (
     <div>
-      <p className="onboarding-step-label">Step 1 of 3</p>
+      <OnboardingStepHeader step={1} />
       <h1 className="onboarding-heading">Your majors and minors</h1>
       <p className="onboarding-subtext">
         Search to add each program you're declared in. We'll add any minor your

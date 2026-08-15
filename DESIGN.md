@@ -64,6 +64,24 @@ the second clause without needing a smaller font size.
 
 ## Component patterns
 
+- **Onboarding step indicator** (documented late — this was designed
+  during interactive prototyping but never written here, and the built
+  onboarding screens shipped text-only as a result; this is the
+  authoritative spec to implement against, not the prose description
+  that preceded it): each of the 3 onboarding steps shows a small dot
+  row directly beside the "Step X of 3" text label — dots don't replace
+  the text, both appear together. Reuses `SemesterTimeline`'s exact
+  color semantics rather than inventing new ones:
+  - Completed step: small solid dot, `--koala-primary` (`#1F5E56`)
+  - Current step: slightly larger dot, `--koala-gold` (`#C08A3E`) fill
+    with a `--koala-bg` (`#F4F5F1`) ring border — same treatment as
+    `SemesterTimeline`'s "current semester" node
+  - Future step: small dot, `--koala-border` (`#DDE1D9`) outline/fill,
+    no border
+  - A "Back" quiet link (`.pw-back` pattern) sits opposite the step
+    indicator on steps 2 and 3 (not step 1, which has nothing to go
+    back to).
+
 - **Set text color explicitly on interactive elements** (options,
   labels, list items) rather than relying purely on inherited color from
   an ancestor container. This bit us directly in the override modal
