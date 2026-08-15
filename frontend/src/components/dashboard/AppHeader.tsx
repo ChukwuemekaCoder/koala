@@ -4,9 +4,10 @@ interface AppHeaderProps {
   firstName: string;
   lastName: string;
   onSignOut: () => void;
+  onNotificationsClick: () => void;
 }
 
-export function AppHeader({ firstName, lastName, onSignOut }: AppHeaderProps) {
+export function AppHeader({ firstName, lastName, onSignOut, onNotificationsClick }: AppHeaderProps) {
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 
   return (
@@ -17,6 +18,7 @@ export function AppHeader({ firstName, lastName, onSignOut }: AppHeaderProps) {
           type="button"
           className="app-header-icon-btn"
           aria-label="Notifications"
+          onClick={onNotificationsClick}
         >
           <IconBell size={20} stroke={1.75} />
         </button>

@@ -20,9 +20,10 @@ import { AddCourseModal } from "./AddCourseModal";
 interface DashboardProps {
   accessToken: string;
   onSignOut: () => void;
+  onNotificationsClick: () => void;
 }
 
-export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
+export function Dashboard({ accessToken, onSignOut, onNotificationsClick }: DashboardProps) {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [projection, setProjection] = useState<Projection | null>(null);
@@ -110,6 +111,7 @@ export function Dashboard({ accessToken, onSignOut }: DashboardProps) {
           firstName={profile.first_name}
           lastName={profile.last_name}
           onSignOut={onSignOut}
+          onNotificationsClick={onNotificationsClick}
         />
 
         <h1 className="dashboard-greeting">Welcome back, {profile.first_name}</h1>
